@@ -1,0 +1,139 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import localforage from 'localforage';
+import { googleSheetsService } from '../services/googleSheetsService';
+
+export interface Customer {
+  id: string;
+  customerId: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email?: string;
+  canLogin: boolean;
+  createdAt: string;
+}
+
+interface CustomerAuthState {
+  customer: Customer | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+  login: (customerId: string, phone: string) => Promise<{ success: boolean; message?: string }>;
+  logout: () => void;
+  clearError: () => void;
+}
+
+export const useCustomerAuthStore = create<CustomerAuthState>()(
+  persist(
+    (set, get) => ({
+      customer: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+
+      login: async (customerId: string, phone: string) => {
+        set({ isLoading: true, error: null });
+
+        try {
+          console.log('Customer login attempt:', customerId);
+
+          // Query customers from Google Sheets
+          const customers = await googleSheetsService.getCustomers();
+          const customerData = customers.find(c => 
+            c.customerId === customerId && c.phone === phone
+          );
+
+          if (!customerData) {
+            console.log('Customer not found or invalid credentials:', customerId);
+            set({ isLoading: false, error: 'شناسه مشتری یا شماره تلفن اشتباه است' });
+            return { success: false, message: 'شناسه مشتری یا شماره تلفن اشتباه است' };
+          }
+
+          // Check if customer can login
+          if (!customerData.canLogin) {
+            console.log('Customer login disabled:', customerId);
+            set({ isLoading: false, error: 'دسترسی شما به سیستم آنلاین غیرفعال است' });
+            return { success: false, message: 'دسترسی شما به سیستم آنلاین غیرفعال است' };
+          }
+
+          // Create customer object for state
+          const customer: Customer = {
+            id: customerData.id,
+            customerId: customerData.customerId,
+            firstName: customerData.firstName,
+            lastName: customerData.lastName,
+            phone: customerData.phone,
+            email: customerData.email,
+            canLogin: customerData.canLogin,
+            createdAt: customerData.createdAt
+          };
+
+          console.log('Customer login successful:', customer.customerId);
+          set({ 
+            customer, 
+            isAuthenticated: true, 
+            isLoading: false, 
+            error: null 
+          });
+
+          return { success: true };
+
+        } catch (error) {
+          console.error('Customer login error:', error);
+          set({ 
+            isLoading: false, 
+            error: 'خطا در برقراری ارتباط با سرور' 
+          });
+          return { 
+            success: false, 
+            message: 'خطا در برقراری ارتباط با سرور' 
+          };
+        }
+      },
+
+      logout: () => {
+        console.log('Customer logging out');
+        set({ 
+          customer: null, 
+          isAuthenticated: false, 
+          error: null 
+        });
+      },
+
+      clearError: () => set({ error: null })
+    }),
+    {
+      name: 'customer-auth-storage',
+      storage: {
+        getItem: async (name) => {
+          try {
+            const value = await localforage.getItem(name);
+            return value || null;
+          } catch (error) {
+            console.error('Error getting customer auth item from storage:', error);
+            return null;
+          }
+        },
+        setItem: async (name, value) => {
+          try {
+            await localforage.setItem(name, value);
+          } catch (error) {
+            console.error('Error setting customer auth item in storage:', error);
+          }
+        },
+        removeItem: async (name) => {
+          try {
+            await localforage.removeItem(name);
+          } catch (error) {
+            console.error('Error removing customer auth item from storage:', error);
+          }
+        },
+      },
+      partialize: (state) => ({
+        customer: state.customer,
+        isAuthenticated: state.isAuthenticated
+      })
+    }
+  )
+);

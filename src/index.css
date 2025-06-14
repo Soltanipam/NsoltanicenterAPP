@@ -1,0 +1,351 @@
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #3D393D;
+  --secondary: #6B7280;
+  --accent: #1D4ED8;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --background: #F9FAFB;
+  --foreground: #111827;
+  --input-background: #FFFFFF;
+  --input-border: #E5E7EB;
+  --input-text: #111827;
+  --input-placeholder: #9CA3AF;
+}
+
+.dark {
+  --primary: #3D393D;
+  --secondary: #9CA3AF;
+  --accent: #60A5FA;
+  --success: #34D399;
+  --warning: #FBBF24;
+  --danger: #F87171;
+  --background: #1F2937;
+  --foreground: #F9FAFB;
+  --input-background: #374151;
+  --input-border: #4B5563;
+  --input-text: #F9FAFB;
+  --input-placeholder: #9CA3AF;
+}
+
+/* Persian Font Configuration */
+* {
+  font-family: 'Vazirmatn', 'Tahoma', 'Arial', sans-serif !important;
+}
+
+/* Ensure proper font loading for PDF generation */
+@font-face {
+  font-family: 'VazirMatn';
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/webfonts/Vazirmatn-Regular.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/webfonts/Vazirmatn-Regular.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'VazirMatn';
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/webfonts/Vazirmatn-Bold.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/webfonts/Vazirmatn-Bold.woff') format('woff');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  @apply bg-background text-foreground;
+  direction: rtl;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* RTL Support */
+.ltr {
+  direction: ltr;
+}
+
+.rtl {
+  direction: rtl;
+}
+
+/* Print Styles */
+@media print {
+  * {
+    font-family: 'Vazirmatn', 'Tahoma', 'Arial', sans-serif !important;
+  }
+  
+  body {
+    direction: rtl;
+    margin: 0;
+    padding: 20px;
+    background: white !important;
+    color: black !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break {
+    page-break-before: always;
+  }
+  
+  .print-avoid-break {
+    page-break-inside: avoid;
+  }
+  
+  /* Ensure proper spacing in print */
+  .form-section {
+    margin-bottom: 25px;
+    page-break-inside: avoid;
+  }
+  
+  /* Print-specific font sizes */
+  h1 { font-size: 18pt !important; }
+  h2 { font-size: 16pt !important; }
+  h3 { font-size: 14pt !important; }
+  p, div, span { font-size: 12pt !important; }
+  
+  /* Ensure borders and backgrounds print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+}
+
+/* PDF Export Styles */
+.pdf-container {
+  font-family: 'Vazirmatn', 'Tahoma', 'Arial', sans-serif !important;
+  direction: rtl;
+  line-height: 1.6;
+  color: #000;
+  background: #fff;
+}
+
+.pdf-header {
+  text-align: center;
+  margin-bottom: 30px;
+  border-bottom: 2px solid #000;
+  padding-bottom: 15px;
+}
+
+.pdf-section {
+  margin-bottom: 25px;
+  page-break-inside: avoid;
+}
+
+.pdf-field {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: baseline;
+}
+
+.pdf-label {
+  font-weight: bold;
+  margin-left: 10px;
+  min-width: 100px;
+}
+
+.pdf-value {
+  flex: 1;
+  border-bottom: 1px dotted #666;
+  padding-bottom: 2px;
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition-all duration-200 focus:outline-none;
+  }
+  
+  .btn-primary {
+    @apply bg-accent text-white hover:bg-accent/90;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-white hover:bg-secondary/90;
+  }
+  
+  .btn-danger {
+    @apply bg-danger text-white hover:bg-danger/90;
+  }
+  
+  .btn-success {
+    @apply bg-success text-white hover:bg-success/90;
+  }
+  
+  .input {
+    @apply w-full px-3 py-2 rounded-md transition-colors duration-200;
+    @apply bg-[--input-background] border border-[--input-border] text-[--input-text];
+    @apply placeholder-[--input-placeholder] focus:outline-none focus:ring-2 focus:ring-accent;
+    font-family: 'Vazirmatn', 'Tahoma', 'Arial', sans-serif !important;
+  }
+  
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6;
+  }
+  
+  /* Persian Number Inputs */
+  .input[type="tel"],
+  .input[type="number"],
+  .input[dir="ltr"] {
+    text-align: left;
+    direction: ltr;
+  }
+  
+  /* Form Validation Styles */
+  .input.error {
+    @apply border-red-500 focus:ring-red-500;
+  }
+  
+  .error-message {
+    @apply text-red-500 text-sm mt-1;
+  }
+  
+  /* Loading States */
+  .loading {
+    @apply opacity-50 pointer-events-none;
+  }
+  
+  /* Responsive Form Layout */
+  .form-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-6;
+  }
+  
+  .form-grid-full {
+    @apply col-span-full;
+  }
+}
+
+/* Fix for dark mode inputs */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--input-text);
+  -webkit-box-shadow: 0 0 0px 1000px var(--input-background) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Ensure proper font rendering in all browsers */
+input, textarea, select, button {
+  font-family: 'Vazirmatn', 'Tahoma', 'Arial', sans-serif !important;
+}
+
+/* Animation Classes */
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Signature Canvas Styles */
+.signature-canvas {
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  cursor: crosshair;
+}
+
+.signature-canvas:hover {
+  border-color: #999;
+}
+
+/* Custom Scrollbar for RTL */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Ensure proper text direction for mixed content */
+.mixed-content {
+  unicode-bidi: plaintext;
+}
+
+/* Form specific styles */
+.form-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.form-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.form-section {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.form-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.required-field::after {
+  content: ' *';
+  color: #ef4444;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .form-container {
+    padding: 1rem;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-section {
+    padding: 1rem;
+  }
+}
