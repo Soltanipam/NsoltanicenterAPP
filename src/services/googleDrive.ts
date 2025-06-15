@@ -1,21 +1,20 @@
 class GoogleDriveService {
   private baseUrl = 'https://www.googleapis.com/drive/v3';
   private uploadUrl = 'https://www.googleapis.com/upload/drive/v3';
-
-  private getAccessToken(): string | null {
-    return localStorage.getItem('google_access_token');
-  }
+  private apiKey = 'YOUR_API_KEY'; // باید از محیط خوانده شود
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const token = this.getAccessToken();
-    if (!token) {
-      throw new Error('کاربر احراز هویت نشده است');
+    // در حالت آفلاین، خطا بدهیم
+    if (!navigator.onLine) {
+      throw new Error('کاربر آفلاین است');
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+    const url = `${this.baseUrl}${endpoint}`;
+    const finalUrl = url + (url.includes('?') ? '&' : '?') + `key=${this.apiKey}`;
+    
+    const response = await fetch(finalUrl, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
         ...options.headers,
       },
@@ -31,9 +30,9 @@ class GoogleDriveService {
 
   async uploadFile(file: File, folderName?: string): Promise<string> {
     try {
-      const token = this.getAccessToken();
-      if (!token) {
-        throw new Error('کاربر احراز هویت نشده است');
+      // در حالت آفلاین، خطا بدهیم
+      if (!navigator.onLine) {
+        throw new Error('کاربر آفلاین است');
       }
 
       // ایجاد فولدر در صورت نیاز
@@ -52,11 +51,9 @@ class GoogleDriveService {
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       form.append('file', file);
 
-      const response = await fetch(`${this.uploadUrl}/files?uploadType=multipart`, {
+      const url = `${this.uploadUrl}/files?uploadType=multipart&key=${this.apiKey}`;
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
         body: form,
       });
 

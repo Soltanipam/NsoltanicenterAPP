@@ -11,15 +11,20 @@ class GoogleSheetsService {
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const token = this.getAccessToken();
-    if (!token) {
-      throw new Error('کاربر احراز هویت نشده است');
+    // در حالت آفلاین، خطا بدهیم
+    if (!navigator.onLine) {
+      throw new Error('کاربر آفلاین است');
     }
 
-    const response = await fetch(`${this.baseUrl}/${this.spreadsheetId}${endpoint}`, {
+    // اگر API key یا token نداریم، از API key استفاده کنیم
+    const apiKey = 'YOUR_API_KEY'; // باید از محیط خوانده شود
+    
+    const url = `${this.baseUrl}/${this.spreadsheetId}${endpoint}`;
+    const finalUrl = url + (url.includes('?') ? '&' : '?') + `key=${apiKey}`;
+    
+    const response = await fetch(finalUrl, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
         ...options.headers,
       },

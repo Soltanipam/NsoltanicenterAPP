@@ -1,4 +1,4 @@
-# راهنمای تنظیم Google Sheets
+# راهنمای تنظیم Google Sheets برای سیستم سلطانی سنتر
 
 ## ساختار مورد نیاز برای جداول
 
@@ -16,8 +16,8 @@ id,username,name,role,job_description,active,permissions,settings,created_at,upd
 ### 2. کاربر اولیه برای تست
 در جدول `users` این ردیف را اضافه کنید:
 
-```csv
-admin123,admin,مدیر سیستم,admin,مدیر کل سیستم,true,"{""canViewReceptions"":true,""canCreateTask"":true,""canCreateReception"":true,""canCompleteServices"":true,""canManageCustomers"":true,""canViewHistory"":true}","{""sidebarOpen"":true}",1403/10/01,1403/10/01,admin@soltanicenter.com,,
+```
+test123,aliuser,علی تستی,admin,مدیر سیستم,true,"{""canViewReceptions"":true,""canCreateTask"":true,""canCreateReception"":true,""canCompleteServices"":true,""canManageCustomers"":true,""canViewHistory"":true}","{""sidebarOpen"":true}",1403/10/01,1403/10/01,admin@soltanicenter.com,,
 ```
 
 **نکته مهم:** ستون password خالی گذاشته شده چون سیستم خودکار رمز عبور را هش می‌کند.
@@ -31,7 +31,7 @@ id,code,name,phone,email,online_access,created_at,updated_at
 
 #### جدول receptions:
 ```
-id,customer_id,date,vehicle_info,status,billing,completed_at,completed_by
+id,customer_info,vehicle_info,service_info,status,images,documents,billing,completed_at,completed_by,created_at,updated_at
 ```
 
 #### جدول tasks:
@@ -60,11 +60,12 @@ id,from_user_id,to_user_id,subject,content,read,created_at
 
 ### مرحله 3: تنظیم رمز عبور اولیه
 1. سیستم را راه‌اندازی کنید
-2. به بخش مدیریت کاربران بروید
-3. رمز عبور برای کاربر admin تنظیم کنید
+2. با نام کاربری `aliuser` وارد شوید
+3. به بخش مدیریت کاربران بروید
+4. رمز عبور برای کاربر admin تنظیم کنید
 
 ## نحوه ورود:
-- نام کاربری: `admin`
+- نام کاربری: `aliuser`
 - رمز عبور: (که توسط مدیر تنظیم می‌شود)
 
 ## ویژگی‌های سیستم:

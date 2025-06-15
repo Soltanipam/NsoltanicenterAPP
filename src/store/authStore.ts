@@ -59,18 +59,16 @@ export const useAuthStore = create<AuthState>()(
             return false;
           }
 
-          // بررسی وجود Google access token
-          const accessToken = localStorage.getItem('google_access_token');
-          if (!accessToken) {
+          // تست اتصال به Google Sheets
+          try {
+            await googleSheetsService.getUsers();
+            set({ connectionStatus: 'connected' });
+            return true;
+          } catch (error) {
+            console.error('Connection to Google Sheets failed:', error);
             set({ connectionStatus: 'disconnected' });
             return false;
           }
-
-          // تست اتصال به Google Sheets
-          await googleSheetsService.getUsers();
-          
-          set({ connectionStatus: 'connected' });
-          return true;
         } catch (error) {
           console.error('Connection check failed:', error);
           set({ connectionStatus: 'disconnected' });
@@ -112,7 +110,7 @@ export const useAuthStore = create<AuthState>()(
             const cachedUsers = offlineSyncService.getCachedData('users');
             if (cachedUsers) {
               const user = cachedUsers.find((u: any) => 
-                (u.username === username || u.email === username) && u.active === 'true'
+                (u.username === username || u.email === username) && u.active === true
               );
               
               if (user && user.password && await bcrypt.compare(password, user.password)) {

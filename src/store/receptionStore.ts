@@ -65,13 +65,16 @@ export const useReceptionStore = create<ReceptionStore>()(
           console.log('Adding reception via Google Sheets:', reception);
           
           const receptionData = {
-            customer_id: reception.customerInfo.name,
-            date: new Date().toLocaleDateString('fa-IR'),
+            customer_info: JSON.stringify(reception.customerInfo),
             vehicle_info: JSON.stringify(reception.vehicleInfo),
-            status: 'pending'
+            service_info: JSON.stringify(reception.serviceInfo),
+            status: 'pending',
+            images: reception.images ? JSON.stringify(reception.images) : '[]',
+            documents: reception.documents ? JSON.stringify(reception.documents) : '[]',
+            created_at: new Date().toLocaleDateString('fa-IR')
           };
           
-          const newReception = await googleSheetsService.addRow('receptions', receptionData);
+          const newReception = await googleSheetsService.addReception(receptionData);
           
           const receptionForStore: Reception = {
             id: newReception.id,
@@ -101,12 +104,17 @@ export const useReceptionStore = create<ReceptionStore>()(
           
           const updateData: any = {};
           if (reception.status) updateData.status = reception.status;
+          if (reception.customerInfo) updateData.customer_info = JSON.stringify(reception.customerInfo);
           if (reception.vehicleInfo) updateData.vehicle_info = JSON.stringify(reception.vehicleInfo);
+          if (reception.serviceInfo) updateData.service_info = JSON.stringify(reception.serviceInfo);
+          if (reception.images) updateData.images = JSON.stringify(reception.images);
+          if (reception.documents) updateData.documents = JSON.stringify(reception.documents);
           if (reception.billing) updateData.billing = JSON.stringify(reception.billing);
           if (reception.completedAt) updateData.completed_at = reception.completedAt;
           if (reception.completedBy) updateData.completed_by = reception.completedBy;
+          updateData.updated_at = new Date().toLocaleDateString('fa-IR');
           
-          await googleSheetsService.updateRow('receptions', id, updateData);
+          await googleSheetsService.updateReception(id, updateData);
           
           set((state) => ({
             receptions: state.receptions.map(r => 
@@ -125,7 +133,7 @@ export const useReceptionStore = create<ReceptionStore>()(
         try {
           console.log('Deleting reception via Google Sheets:', id);
           
-          await googleSheetsService.deleteRow('receptions', id);
+          await googleSheetsService.deleteReception(id);
           
           set((state) => ({
             receptions: state.receptions.filter(r => r.id !== id)
@@ -149,7 +157,7 @@ export const useReceptionStore = create<ReceptionStore>()(
             completed_at: new Date().toLocaleDateString('fa-IR')
           };
           
-          await googleSheetsService.updateRow('receptions', id, updateData);
+          await googleSheetsService.updateReception(id, updateData);
           
           set((state) => ({
             receptions: state.receptions.map(r => 
