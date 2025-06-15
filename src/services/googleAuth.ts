@@ -13,6 +13,7 @@ class GoogleAuthService {
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private user: GoogleUser | null = null;
+  private tokenExpiry: number | null = null;
 
   constructor() {
     this.loadFromStorage();
@@ -22,11 +23,13 @@ class GoogleAuthService {
     const token = localStorage.getItem('google_access_token');
     const refresh = localStorage.getItem('google_refresh_token');
     const user = localStorage.getItem('google_user');
+    const expiry = localStorage.getItem('google_token_expiry');
     
     if (token && user) {
       this.accessToken = token;
       this.refreshToken = refresh;
       this.user = JSON.parse(user);
+      this.tokenExpiry = expiry ? parseInt(expiry) : null;
     }
   }
 
@@ -39,6 +42,9 @@ class GoogleAuthService {
     }
     if (this.user) {
       localStorage.setItem('google_user', JSON.stringify(this.user));
+    }
+    if (this.tokenExpiry) {
+      localStorage.setItem('google_token_expiry', this.tokenExpiry.toString());
     }
   }
 
@@ -88,6 +94,11 @@ class GoogleAuthService {
 
       this.accessToken = tokenData.access_token;
       this.refreshToken = tokenData.refresh_token;
+      
+      // Calculate token expiry time
+      if (tokenData.expires_in) {
+        this.tokenExpiry = Date.now() + (tokenData.expires_in * 1000);
+      }
 
       // دریافت اطلاعات کاربر
       const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -120,8 +131,9 @@ class GoogleAuthService {
     }
   }
 
-  async refreshAccessToken(): Promise<boolean> {
+  async refreshToken(): Promise<boolean> {
     if (!this.refreshToken) {
+      console.warn('No refresh token available');
       return false;
     }
 
@@ -146,8 +158,17 @@ class GoogleAuthService {
         if (data.refresh_token) {
           this.refreshToken = data.refresh_token;
         }
+        
+        // Calculate new token expiry time
+        if (data.expires_in) {
+          this.tokenExpiry = Date.now() + (data.expires_in * 1000);
+        }
+        
         this.saveToStorage();
+        console.log('Access token refreshed successfully');
         return true;
+      } else {
+        console.error('Failed to refresh token:', data);
       }
     } catch (error) {
       console.error('Error refreshing token:', error);
@@ -160,9 +181,11 @@ class GoogleAuthService {
     this.accessToken = null;
     this.refreshToken = null;
     this.user = null;
+    this.tokenExpiry = null;
     localStorage.removeItem('google_access_token');
     localStorage.removeItem('google_refresh_token');
     localStorage.removeItem('google_user');
+    localStorage.removeItem('google_token_expiry');
   }
 
   getAccessToken(): string | null {
@@ -175,6 +198,30 @@ class GoogleAuthService {
 
   isAuthenticated(): boolean {
     return !!this.accessToken && !!this.user;
+  }
+
+  isTokenExpired(): boolean {
+    if (!this.tokenExpiry) {
+      return false; // If we don't know expiry, assume it's still valid
+    }
+    return Date.now() >= this.tokenExpiry;
+  }
+
+  async ensureValidToken(): Promise<string | null> {
+    if (!this.accessToken) {
+      throw new Error('No access token found. Please authenticate with Google first.');
+    }
+
+    // Check if token is expired and refresh if needed
+    if (this.isTokenExpired() && this.refreshToken) {
+      console.log('Access token expired, attempting to refresh...');
+      const refreshed = await this.refreshToken();
+      if (!refreshed) {
+        throw new Error('Access token expired and refresh failed. Please re-authenticate with Google.');
+      }
+    }
+
+    return this.accessToken;
   }
 }
 

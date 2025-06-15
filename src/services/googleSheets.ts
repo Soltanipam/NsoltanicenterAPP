@@ -10,28 +10,7 @@ class GoogleSheetsService {
   private spreadsheetId = GOOGLE_CONFIG.SPREADSHEET_ID;
 
   private async getValidAccessToken(): Promise<string> {
-    // Try to get current access token
-    let accessToken = localStorage.getItem('google_access_token');
-    
-    if (!accessToken) {
-      throw new Error('No access token found. Please authenticate with Google first.');
-    }
-
-    // Check if token is expired and refresh if needed
-    const tokenExpiry = localStorage.getItem('google_token_expiry');
-    if (tokenExpiry && Date.now() >= parseInt(tokenExpiry)) {
-      try {
-        await googleAuthService.refreshToken();
-        accessToken = localStorage.getItem('google_access_token');
-        if (!accessToken) {
-          throw new Error('Failed to refresh access token');
-        }
-      } catch (error) {
-        throw new Error('Access token expired and refresh failed. Please re-authenticate with Google.');
-      }
-    }
-
-    return accessToken;
+    return await googleAuthService.ensureValidToken();
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
@@ -62,7 +41,7 @@ class GoogleSheetsService {
         // Try to refresh token once
         try {
           await googleAuthService.refreshToken();
-          const newAccessToken = localStorage.getItem('google_access_token');
+          const newAccessToken = await googleAuthService.ensureValidToken();
           if (newAccessToken) {
             // Retry the request with new token
             const retryResponse = await fetch(url, {
