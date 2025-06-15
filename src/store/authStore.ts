@@ -24,7 +24,6 @@ export interface User {
     sidebarOpen: boolean;
   };
   active?: boolean;
-  auth_user_id?: string;
 }
 
 interface AuthState {
@@ -82,15 +81,9 @@ export const useAuthStore = create<AuthState>()(
             await googleSheetsService.getUsers();
             set({ connectionStatus: 'connected' });
             return true;
-          } catch (error: any) {
+          } catch (error) {
             console.error('Connection to Google Sheets failed:', error);
             set({ connectionStatus: 'disconnected' });
-            
-            // Check if it's a credentials issue
-            if (error.message.includes('فایل احراز هویت یافت نشد')) {
-              console.error('Credentials file not found or invalid');
-            }
-            
             return false;
           }
         } catch (error) {
@@ -178,8 +171,7 @@ export const useAuthStore = create<AuthState>()(
               jobDescription: userData.job_description,
               permissions: typeof userData.permissions === 'string' ? JSON.parse(userData.permissions) : (userData.permissions || {}),
               settings: typeof userData.settings === 'string' ? JSON.parse(userData.settings) : (userData.settings || { sidebarOpen: true }),
-              active: userData.active === 'true',
-              auth_user_id: userData.id
+              active: userData.active === 'true'
             };
 
             set({ user, isAuthenticated: true });

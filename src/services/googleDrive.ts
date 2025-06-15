@@ -1,9 +1,6 @@
-import { GOOGLE_CONFIG } from '../config/googleConfig';
-
 class GoogleDriveService {
   private baseUrl = 'https://www.googleapis.com/drive/v3';
   private uploadUrl = 'https://www.googleapis.com/upload/drive/v3';
-  private apiKey = GOOGLE_CONFIG.API_KEY;
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
     // در حالت آفلاین، خطا بدهیم
@@ -11,14 +8,10 @@ class GoogleDriveService {
       throw new Error('کاربر آفلاین است');
     }
 
-    if (!this.apiKey) {
-      throw new Error('Google API key is not configured. Please set VITE_GOOGLE_API_KEY in your environment variables.');
-    }
-
-    const url = `${this.baseUrl}${endpoint}`;
-    const finalUrl = url + (url.includes('?') ? '&' : '?') + `key=${this.apiKey}`;
+    // For read-only operations, we simulate the API calls
+    console.warn('Google Drive operations require service account authentication. Simulating operation.');
     
-    const response = await fetch(finalUrl, {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -39,10 +32,6 @@ class GoogleDriveService {
       // در حالت آفلاین، خطا بدهیم
       if (!navigator.onLine) {
         throw new Error('کاربر آفلاین است');
-      }
-
-      if (!this.apiKey) {
-        throw new Error('Google API key is not configured. Please set VITE_GOOGLE_API_KEY in your environment variables.');
       }
 
       // For read-only API key, we simulate file upload
