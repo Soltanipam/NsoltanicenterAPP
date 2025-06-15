@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { googleSheetsService } from '../services/googleSheets';
+import bcrypt from 'bcryptjs';
 
 export interface UserPermissions {
   canViewReceptions: boolean;
@@ -54,6 +55,9 @@ export const useUserStore = create<UserStore>()(
         try {
           console.log('Adding user via Google Sheets:', user);
           
+          // Hash password
+          const hashedPassword = await bcrypt.hash(user.password, 10);
+          
           const userData = {
             username: user.username,
             name: user.name,
@@ -62,7 +66,7 @@ export const useUserStore = create<UserStore>()(
             job_description: user.jobDescription || '',
             active: user.active ? 'true' : 'false',
             permissions: JSON.stringify(user.permissions || defaultPermissions),
-            password: user.password,
+            password: hashedPassword,
             created_at: new Date().toLocaleDateString('fa-IR'),
             updated_at: new Date().toLocaleDateString('fa-IR')
           };
@@ -133,8 +137,11 @@ export const useUserStore = create<UserStore>()(
         try {
           console.log('Updating user password via Google Sheets:', id);
           
+          // Hash new password
+          const hashedPassword = await bcrypt.hash(newPassword, 10);
+          
           await googleSheetsService.updateUser(id, { 
-            password: newPassword,
+            password: hashedPassword,
             updated_at: new Date().toLocaleDateString('fa-IR')
           });
           

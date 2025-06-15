@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { AlertCircle, Wifi, WifiOff, User, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Logo from '../../components/ui/Logo';
 import Button from '../../components/ui/Button';
@@ -9,22 +9,20 @@ import { offlineSyncService } from '../../services/offlineSync';
 
 const Login = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isInitializing, setIsInitializing] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    username: '',
+    password: ''
+  });
   
-  const { login, handleAuthCallback, connectionStatus, checkConnection, initialize } = useAuthStore();
+  const { login, connectionStatus, checkConnection, initialize } = useAuthStore();
   
-  // بررسی callback از Google OAuth
   useEffect(() => {
-    const code = searchParams.get('code');
-    if (code) {
-      handleGoogleCallback(code);
-    } else {
-      initializeAuth();
-    }
-  }, [searchParams]);
+    initializeAuth();
+  }, []);
 
   const initializeAuth = async () => {
     try {
@@ -39,12 +37,19 @@ const Login = () => {
     }
   };
 
-  const handleGoogleCallback = async (code: string) => {
-    setLoading(true);
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
     setError('');
+    setLoading(true);
+    
+    if (!formData.username || !formData.password) {
+      setError('لطفاً نام کاربری و رمز عبور را وارد کنید');
+      setLoading(false);
+      return;
+    }
     
     try {
-      const result = await handleAuthCallback(code);
+      const result = await login(formData.username, formData.password);
       
       if (result.success) {
         toast.success('با موفقیت وارد شدید');
@@ -52,32 +57,7 @@ const Login = () => {
       } else {
         setError(result.message || 'خطا در ورود به سیستم');
         toast.error(result.message || 'خطا در ورود به سیستم');
-        // پاک کردن URL
-        navigate('/login', { replace: true });
       }
-    } catch (err) {
-      console.error('Callback error:', err);
-      setError('خطا در تکمیل احراز هویت');
-      toast.error('خطا در تکمیل احراز هویت');
-      navigate('/login', { replace: true });
-    } finally {
-      setLoading(false);
-      setIsInitializing(false);
-    }
-  };
-
-  const handleLogin = async () => {
-    setError('');
-    setLoading(true);
-    
-    try {
-      const result = await login();
-      
-      if (!result.success) {
-        setError(result.message || 'خطا در ورود به سیستم');
-        toast.error(result.message || 'خطا در ورود به سیستم');
-      }
-      // در صورت موفقیت، کاربر به Google هدایت می‌شود
     } catch (err) {
       console.error('Login error:', err);
       setError('خطا در برقراری ارتباط با سرور');
@@ -217,35 +197,92 @@ const Login = () => {
             </div>
           )}
 
-          {/* Google Sign-In Info */}
+          {/* Login Instructions */}
           <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
             <div className="flex items-start gap-3">
               <AlertCircle size={20} className="text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
               <div className="text-sm">
                 <p className="text-blue-800 dark:text-blue-200 font-medium mb-2">
-                  ورود با حساب Google:
+                  ورود با نام کاربری و رمز عبور:
                 </p>
                 <div className="text-blue-700 dark:text-blue-300 text-xs space-y-1">
-                  <p>• برای ورود به سیستم از حساب Google خود استفاده کنید</p>
-                  <p>• اولین کاربری که وارد شود، مدیر سیستم خواهد بود</p>
-                  <p>• سایر کاربران با نقش تکنسین ثبت می‌شوند</p>
+                  <p>• از نام کاربری یا ایمیل خود برای ورود استفاده کنید</p>
+                  <p>• رمز عبور توسط مدیر سیستم تعیین می‌شود</p>
                   <p>• اطلاعات شما در Google Sheets ذخیره می‌شود</p>
+                  <p>• پس از ورود اولیه، می‌توانید در حالت آفلاین کار کنید</p>
                 </div>
               </div>
             </div>
           </div>
           
-          <div className="space-y-6">
-            <Button
-              onClick={handleLogin}
-              variant="primary"
-              size="lg"
-              isLoading={loading}
-              fullWidth
-              disabled={loading}
-            >
-              ورود با Google
-            </Button>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-1">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                نام کاربری یا ایمیل
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <User size={16} className="text-gray-400" />
+                </div>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  required
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  className="input pr-10 focus:ring-accent focus:border-accent"
+                  placeholder="نام کاربری یا ایمیل خود را وارد کنید"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-1">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                رمز عبور
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <Lock size={16} className="text-gray-400" />
+                </div>
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="input pr-10 pl-10 focus:ring-accent focus:border-accent"
+                  placeholder="رمز عبور خود را وارد کنید"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 left-0 flex items-center pl-3"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff size={16} className="text-gray-400" />
+                  ) : (
+                    <Eye size={16} className="text-gray-400" />
+                  )}
+                </button>
+              </div>
+            </div>
+            
+            <div>
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                isLoading={loading}
+                fullWidth
+                disabled={loading}
+              >
+                ورود به سیستم
+              </Button>
+            </div>
 
             <div className="text-sm text-center space-y-3">
               <div className="border-t pt-3">
@@ -259,7 +296,7 @@ const Login = () => {
                 </button>
               </div>
             </div>
-          </div>
+          </form>
 
           {/* Offline Mode Info */}
           {connectionStatus === 'disconnected' && (

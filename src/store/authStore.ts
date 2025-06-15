@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
-import { googleAuthService, GoogleUser } from '../services/googleAuth';
 import { googleSheetsService } from '../services/googleSheets';
 import { offlineSyncService } from '../services/offlineSync';
+import bcrypt from 'bcryptjs';
 
 export type UserRole = 'admin' | 'receptionist' | 'technician' | 'warehouse' | 'detailing' | 'accountant';
 
@@ -25,7 +25,7 @@ export interface User {
   settings?: {
     sidebarOpen: boolean;
   };
-  googleUser?: GoogleUser;
+  auth_user_id?: string;
 }
 
 interface AuthState {
@@ -33,8 +33,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isInitialized: boolean;
   connectionStatus: 'checking' | 'connected' | 'disconnected';
-  login: () => Promise<{ success: boolean; message?: string }>;
-  handleAuthCallback: (code: string) => Promise<{ success: boolean; message?: string }>;
+  login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
   updateUserSettings: (settings: Partial<User['settings']>) => void;
@@ -61,9 +60,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           // تست اتصال به Google Sheets
-          if (googleAuthService.isAuthenticated()) {
-            await googleSheetsService.getUsers();
-          }
+          await googleSheetsService.getUsers();
           
           set({ connectionStatus: 'connected' });
           return true;
@@ -81,44 +78,11 @@ export const useAuthStore = create<AuthState>()(
           // بررسی اتصال
           const isConnected = await get().checkConnection();
           
-          // بررسی وجود کاربر احراز هویت شده
-          if (googleAuthService.isAuthenticated()) {
-            const googleUser = googleAuthService.getCurrentUser();
-            
-            if (googleUser && isConnected) {
-              try {
-                // جستجوی کاربر در Google Sheets
-                const users = await googleSheetsService.getUsers();
-                const existingUser = users.find(u => u.email === googleUser.email);
-                
-                if (existingUser) {
-                  const user: User = {
-                    id: existingUser.id as string,
-                    email: existingUser.email as string,
-                    username: existingUser.username as string,
-                    name: existingUser.name as string,
-                    role: (existingUser.role as UserRole) || 'technician',
-                    jobDescription: existingUser.job_description as string,
-                    permissions: existingUser.permissions ? JSON.parse(existingUser.permissions as string) : {},
-                    settings: existingUser.settings ? JSON.parse(existingUser.settings as string) : { sidebarOpen: true },
-                    googleUser
-                  };
-                  
-                  set({ user, isAuthenticated: true });
-                  console.log('User session restored:', user.username);
-                } else {
-                  // کاربر جدید - ایجاد پروفایل
-                  await get().createUserProfile(googleUser);
-                }
-              } catch (error) {
-                console.error('Error loading user profile:', error);
-                // در صورت خطا، از کش استفاده کنیم
-                const cachedUser = offlineSyncService.getCachedData('current_user');
-                if (cachedUser) {
-                  set({ user: cachedUser, isAuthenticated: true });
-                }
-              }
-            }
+          // بررسی وجود کاربر احراز هویت شده در localStorage
+          const savedUser = offlineSyncService.getCachedData('current_user');
+          if (savedUser) {
+            set({ user: savedUser, isAuthenticated: true });
+            console.log('User session restored:', savedUser.username);
           }
           
           set({ isInitialized: true });
@@ -128,124 +92,103 @@ export const useAuthStore = create<AuthState>()(
           set({ isInitialized: true, connectionStatus: 'disconnected' });
         }
       },
-
-      createUserProfile: async (googleUser: GoogleUser) => {
+      
+      login: async (username: string, password: string) => {
         try {
-          // بررسی اینکه آیا این اولین کاربر است
-          const users = await googleSheetsService.getUsers();
-          const isFirstUser = users.length === 0;
+          console.log('Starting login process for:', username);
           
-          const userData = {
-            email: googleUser.email,
-            username: googleUser.email.split('@')[0],
-            name: googleUser.name,
-            role: isFirstUser ? 'admin' : 'technician',
-            job_description: isFirstUser ? 'مدیر کل سیستم' : '',
-            permissions: JSON.stringify(isFirstUser ? {
-              canViewReceptions: true,
-              canCreateTask: true,
-              canCreateReception: true,
-              canCompleteServices: true,
-              canManageCustomers: true,
-              canViewHistory: true
-            } : {}),
-            settings: JSON.stringify({ sidebarOpen: true })
-          };
-
-          if (offlineSyncService.isConnected()) {
-            await googleSheetsService.addUser(userData);
-          } else {
-            await offlineSyncService.queueAction('create', 'users', userData);
+          // بررسی اتصال
+          const isConnected = await get().checkConnection();
+          
+          if (!isConnected) {
+            // حالت آفلاین - بررسی کش
+            const cachedUsers = offlineSyncService.getCachedData('users');
+            if (cachedUsers) {
+              const user = cachedUsers.find((u: any) => 
+                (u.username === username || u.email === username) && u.active
+              );
+              
+              if (user && user.password && await bcrypt.compare(password, user.password)) {
+                const userForAuth: User = {
+                  id: user.id,
+                  email: user.email,
+                  username: user.username,
+                  name: user.name,
+                  role: user.role,
+                  jobDescription: user.jobDescription,
+                  permissions: user.permissions || {},
+                  settings: user.settings || { sidebarOpen: true },
+                  auth_user_id: user.auth_user_id
+                };
+                
+                offlineSyncService.cacheData('current_user', userForAuth);
+                set({ user: userForAuth, isAuthenticated: true });
+                return { success: true };
+              }
+            }
+            
+            return { 
+              success: false, 
+              message: 'نام کاربری یا رمز عبور اشتباه است (حالت آفلاین)' 
+            };
           }
 
+          // حالت آنلاین - بررسی Google Sheets
+          const users = await googleSheetsService.getUsers();
+          const userData = users.find((u: any) => 
+            (u.username === username || u.email === username) && u.active === 'true'
+          );
+
+          if (!userData) {
+            return { 
+              success: false, 
+              message: 'نام کاربری یا ایمیل یافت نشد' 
+            };
+          }
+
+          // بررسی رمز عبور
+          if (!userData.password) {
+            return { 
+              success: false, 
+              message: 'رمز عبور برای این کاربر تنظیم نشده است' 
+            };
+          }
+
+          const isPasswordValid = await bcrypt.compare(password, userData.password);
+          if (!isPasswordValid) {
+            return { 
+              success: false, 
+              message: 'رمز عبور اشتباه است' 
+            };
+          }
+
+          // ایجاد شیء کاربر
           const user: User = {
-            id: userData.id || Date.now().toString(),
+            id: userData.id,
             email: userData.email,
             username: userData.username,
             name: userData.name,
             role: userData.role as UserRole,
             jobDescription: userData.job_description,
-            permissions: JSON.parse(userData.permissions),
-            settings: JSON.parse(userData.settings),
-            googleUser
+            permissions: userData.permissions ? JSON.parse(userData.permissions) : {},
+            settings: userData.settings ? JSON.parse(userData.settings) : { sidebarOpen: true },
+            auth_user_id: userData.auth_user_id
           };
 
-          // کش کردن اطلاعات کاربر
+          // کش کردن اطلاعات کاربر و لیست کاربران
           offlineSyncService.cacheData('current_user', user);
+          offlineSyncService.cacheData('users', users);
           
           set({ user, isAuthenticated: true });
-          console.log('User profile created:', user.username);
-        } catch (error) {
-          console.error('Error creating user profile:', error);
-          throw error;
-        }
-      },
-      
-      login: async () => {
-        try {
-          console.log('Starting Google authentication...');
-          return await googleAuthService.signIn();
+          console.log('User login successful:', user.username);
+
+          return { success: true };
+
         } catch (error) {
           console.error('Login error:', error);
           return { 
             success: false, 
-            message: 'خطا در ورود به سیستم' 
-          };
-        }
-      },
-
-      handleAuthCallback: async (code: string) => {
-        try {
-          console.log('Handling auth callback...');
-          
-          const result = await googleAuthService.handleCallback(code);
-          if (!result.success || !result.user) {
-            return result;
-          }
-
-          // بررسی اتصال
-          const isConnected = await get().checkConnection();
-          
-          if (isConnected) {
-            // جستجوی کاربر در Google Sheets
-            const users = await googleSheetsService.getUsers();
-            const existingUser = users.find(u => u.email === result.user!.email);
-            
-            if (existingUser) {
-              const user: User = {
-                id: existingUser.id as string,
-                email: existingUser.email as string,
-                username: existingUser.username as string,
-                name: existingUser.name as string,
-                role: (existingUser.role as UserRole) || 'technician',
-                jobDescription: existingUser.job_description as string,
-                permissions: existingUser.permissions ? JSON.parse(existingUser.permissions as string) : {},
-                settings: existingUser.settings ? JSON.parse(existingUser.settings as string) : { sidebarOpen: true },
-                googleUser: result.user
-              };
-              
-              offlineSyncService.cacheData('current_user', user);
-              set({ user, isAuthenticated: true });
-            } else {
-              // کاربر جدید
-              await get().createUserProfile(result.user);
-            }
-          } else {
-            // حالت آفلاین - از کش استفاده کنیم
-            const cachedUser = offlineSyncService.getCachedData('current_user');
-            if (cachedUser && cachedUser.email === result.user.email) {
-              set({ user: cachedUser, isAuthenticated: true });
-            } else {
-              return { success: false, message: 'اتصال اینترنت برای ورود اولیه ضروری است' };
-            }
-          }
-
-          return { success: true };
-        } catch (error) {
-          console.error('Auth callback error:', error);
-          return { 
-            success: false, 
-            message: 'خطا در تکمیل احراز هویت' 
+            message: 'خطا در برقراری ارتباط با سرور' 
           };
         }
       },
@@ -253,7 +196,6 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         try {
           console.log('User logging out');
-          googleAuthService.signOut();
           offlineSyncService.clearCache();
           set({ user: null, isAuthenticated: false });
         } catch (error) {
