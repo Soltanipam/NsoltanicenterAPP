@@ -150,7 +150,7 @@ const UserManagement = () => {
       toast.success('کاربر با موفقیت حذف شد');
     } catch (error: any) {
       // Check if error is related to Google authentication
-      if (error.message && error.message.includes('برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید')) {
+      if (error.message && (error.message.includes('برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید') || error.message.includes('No access token found. Please authenticate with Google first.'))) {
         setPendingOperation(() => () => handleDelete(userId));
         setShowGoogleAuthModal(true);
       } else {
@@ -185,7 +185,7 @@ const UserManagement = () => {
     } catch (error: any) {
       console.error('Password update error:', error);
       // Check if error is related to Google authentication
-      if (error.message && error.message.includes('برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید')) {
+      if (error.message && (error.message.includes('برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید') || error.message.includes('No access token found. Please authenticate with Google first.'))) {
         setPendingOperation(() => handlePasswordChange);
         setShowGoogleAuthModal(true);
       } else {
@@ -268,7 +268,7 @@ const UserManagement = () => {
     } catch (error: any) {
       console.error('User operation error:', error);
       // Check if error is related to Google authentication
-      if (error.message && error.message.includes('برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید')) {
+      if (error.message && (error.message.includes('برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید') || error.message.includes('No access token found. Please authenticate with Google first.'))) {
         setPendingOperation(() => () => handleSubmit(e));
         setShowGoogleAuthModal(true);
       } else {
