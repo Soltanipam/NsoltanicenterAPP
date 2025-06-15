@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
 import { googleSheetsService } from '../services/googleSheets';
+import { googleAuthService } from '../services/googleAuth';
 import { offlineSyncService } from '../services/offlineSync';
 import bcrypt from 'bcryptjs';
 
@@ -78,6 +79,13 @@ export const useAuthStore = create<AuthState>()(
             return false;
           }
 
+          // بررسی وجود احراز هویت Google
+          if (!googleAuthService.isAuthenticated()) {
+            console.log('Google authentication not available, setting disconnected status');
+            set({ connectionStatus: 'disconnected' });
+            return false;
+          }
+
           // تست اتصال به Google Sheets
           try {
             await googleSheetsService.getUsers();
@@ -99,8 +107,8 @@ export const useAuthStore = create<AuthState>()(
         try {
           console.log('Initializing auth store...');
           
-          // بررسی اتصال
-          const isConnected = await get().checkConnection();
+          // بررسی اتصال (اما عدم اتصال مانع ادامه نمی‌شود)
+          await get().checkConnection();
           
           // بررسی وجود کاربر احراز هویت شده در localStorage
           const savedUser = offlineSyncService.getCachedData('current_user');
