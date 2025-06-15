@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { PlusCircle, Search, Edit, Trash2, X, Eye, EyeOff, ToggleLeft, ToggleRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Button from '../../components/ui/Button';
@@ -8,7 +8,7 @@ import { useAuthStore } from '../../store/authStore';
 import { persianToEnglish } from '../../utils/numberUtils';
 
 const CustomerManagement = () => {
-  const { customers, addCustomer, updateCustomer, deleteCustomer } = useCustomerStore();
+  const { customers, loadCustomers, addCustomer, updateCustomer, deleteCustomer, isLoading, error, clearError } = useCustomerStore();
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -21,9 +21,19 @@ const CustomerManagement = () => {
     lastName: '',
     phone: '',
     email: '',
-    password: '',
     canLogin: true
   });
+
+  useEffect(() => {
+    loadCustomers();
+  }, [loadCustomers]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      clearError();
+    }
+  }, [error, clearError]);
   
   const filteredCustomers = customers.filter(customer => 
     (customer.firstName || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -44,7 +54,6 @@ const CustomerManagement = () => {
       lastName: customer.lastName,
       phone: customer.phone,
       email: customer.email || '',
-      password: customer.password || '',
       canLogin: customer.canLogin
     });
     setShowModal(true);
@@ -84,7 +93,6 @@ const CustomerManagement = () => {
           lastName: formData.lastName,
           phone: phoneNumber,
           email: formData.email,
-          password: formData.password || phoneNumber,
           canLogin: formData.canLogin
         });
         toast.success('اطلاعات مشتری با موفقیت ویرایش شد');
@@ -93,13 +101,14 @@ const CustomerManagement = () => {
           firstName: formData.firstName,
           lastName: formData.lastName,
           phone: phoneNumber,
-          email: formData.email
+          email: formData.email,
+          canLogin: formData.canLogin
         });
         toast.success('مشتری جدید با موفقیت ثبت شد');
       }
       setShowModal(false);
       setEditingCustomer(null);
-      setFormData({ firstName: '', lastName: '', phone: '', email: '', password: '', canLogin: true });
+      setFormData({ firstName: '', lastName: '', phone: '', email: '', canLogin: true });
     } catch (error) {
       toast.error('خطا در ذخیره اطلاعات مشتری');
     }
@@ -119,9 +128,10 @@ const CustomerManagement = () => {
             leftIcon={<PlusCircle size={16} />}
             onClick={() => {
               setEditingCustomer(null);
-              setFormData({ firstName: '', lastName: '', phone: '', email: '', password: '', canLogin: true });
+              setFormData({ firstName: '', lastName: '', phone: '', email: '', canLogin: true });
               setShowModal(true);
             }}
+            disabled={isLoading}
           >
             مشتری جدید
           </Button>
@@ -174,7 +184,13 @@ const CustomerManagement = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {filteredCustomers.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                  در حال بارگذاری...
+                </td>
+              </tr>
+            ) : filteredCustomers.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                   مشتری‌ای یافت نشد
@@ -321,46 +337,19 @@ const CustomerManagement = () => {
                     dir="ltr"
                   />
                 </div>
-                
-                {editingCustomer && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      رمز ورود (شماره تماس)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: persianToEnglish(e.target.value) })}
-                        className="input pr-3 pl-10"
-                        placeholder="شماره تماس به عنوان رمز ورود"
-                        dir="ltr"
-                      />
-                      <button
-                        type="button"
-                        className="absolute left-3 top-1/2 -translate-y-1/2"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </div>
-                )}
 
-                {editingCustomer && (
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="canLogin"
-                      checked={formData.canLogin}
-                      onChange={(e) => setFormData({ ...formData, canLogin: e.target.checked })}
-                      className="h-4 w-4 text-accent focus:ring-accent"
-                    />
-                    <label htmlFor="canLogin" className="mr-2 text-sm font-medium">
-                      دسترسی ورود به سیستم آنلاین
-                    </label>
-                  </div>
-                )}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="canLogin"
+                    checked={formData.canLogin}
+                    onChange={(e) => setFormData({ ...formData, canLogin: e.target.checked })}
+                    className="h-4 w-4 text-accent focus:ring-accent"
+                  />
+                  <label htmlFor="canLogin" className="mr-2 text-sm font-medium">
+                    دسترسی ورود به سیستم آنلاین
+                  </label>
+                </div>
                 
                 <div className="flex justify-end gap-3 pt-4">
                   <Button
@@ -376,6 +365,7 @@ const CustomerManagement = () => {
                   <Button
                     type="submit"
                     variant="primary"
+                    isLoading={isLoading}
                   >
                     {editingCustomer ? 'به‌روزرسانی' : 'ایجاد مشتری'}
                   </Button>

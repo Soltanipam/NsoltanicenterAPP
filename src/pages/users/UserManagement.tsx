@@ -10,7 +10,6 @@ interface User {
   id: string;
   username: string;
   name: string;
-  email: string;
   role: UserRole;
   jobDescription: string;
   active: boolean;
@@ -28,7 +27,7 @@ const defaultPermissions: UserPermissions = {
 };
 
 const UserManagement = () => {
-  const { users, addUser, updateUser, deleteUser, updatePassword } = useUserStore();
+  const { users, loadUsers, addUser, updateUser, deleteUser, updatePassword, isLoading, error, clearError } = useUserStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -42,7 +41,6 @@ const UserManagement = () => {
   const [formData, setFormData] = useState({
     username: '',
     name: '',
-    email: '',
     role: 'technician' as UserRole,
     jobDescription: '',
     active: true,
@@ -50,13 +48,23 @@ const UserManagement = () => {
     password: '',
     confirmPassword: ''
   });
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      clearError();
+    }
+  }, [error, clearError]);
   
   useEffect(() => {
     if (editingUser) {
       setFormData({
         username: editingUser.username,
         name: editingUser.name,
-        email: editingUser.email,
         role: editingUser.role,
         jobDescription: editingUser.jobDescription || '',
         active: editingUser.active,
@@ -68,7 +76,6 @@ const UserManagement = () => {
       setFormData({
         username: '',
         name: '',
-        email: '',
         role: 'technician',
         jobDescription: '',
         active: true,
@@ -82,7 +89,6 @@ const UserManagement = () => {
   const filteredUsers = users.filter(user => 
     (user.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
     (user.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (user.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     getRoleName(user.role).toLowerCase().includes(searchQuery.toLowerCase())
   );
   
@@ -169,11 +175,7 @@ const UserManagement = () => {
       setSelectedUser(null);
     } catch (error: any) {
       console.error('Password update error:', error);
-      if (error.message?.includes('هنوز اکانت احراز هویت ندارد')) {
-        toast.error('این کاربر هنوز اکانت احراز هویت ندارد. ابتدا اکانت ایجاد کنید.');
-      } else {
-        toast.error('خطا در تغییر رمز عبور: ' + (error.message || 'خطای نامشخص'));
-      }
+      toast.error('خطا در تغییر رمز عبور');
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -182,8 +184,8 @@ const UserManagement = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    if (!formData.username || !formData.name || !formData.email) {
-      toast.error('لطفاً نام کاربری، نام و ایمیل را وارد کنید');
+    if (!formData.username || !formData.name) {
+      toast.error('لطفاً نام کاربری و نام را وارد کنید');
       return;
     }
 
@@ -210,7 +212,6 @@ const UserManagement = () => {
         await updateUser(editingUser.id, {
           username: formData.username,
           name: formData.name,
-          email: formData.email,
           role: formData.role,
           jobDescription: formData.jobDescription,
           active: formData.active,
@@ -221,14 +222,13 @@ const UserManagement = () => {
         await addUser({
           username: formData.username,
           name: formData.name,
-          email: formData.email,
           role: formData.role,
           jobDescription: formData.jobDescription,
           active: formData.active,
           permissions: formData.permissions,
           password: formData.password
         });
-        toast.success('کاربر جدید با موفقیت ایجاد شد و می‌تواند با نام کاربری وارد شود');
+        toast.success('کاربر جدید با موفقیت ایجاد شد');
       }
       setShowModal(false);
       setEditingUser(null);
@@ -252,6 +252,7 @@ const UserManagement = () => {
             setEditingUser(null);
             setShowModal(true);
           }}
+          disabled={isLoading}
         >
           کاربر جدید
         </Button>
@@ -265,9 +266,9 @@ const UserManagement = () => {
             <p className="font-medium mb-1">نحوه مدیریت کاربران:</p>
             <ul className="list-disc list-inside space-y-1 text-xs">
               <li>هنگام ایجاد کاربر جدید، رمز عبور اولیه تعیین کنید</li>
-              <li>کاربران می‌توانند با نام کاربری یا ایمیل وارد شوند</li>
+              <li>کاربران می‌توانند با نام کاربری وارد شوند</li>
               <li>مدیر می‌تواند رمز عبور کاربران را تغییر دهد</li>
-              <li>حساب احراز هویت به صورت خودکار ایجاد می‌شود</li>
+              <li>اطلاعات در حافظه محلی ذخیره می‌شود</li>
             </ul>
           </div>
         </div>
@@ -299,16 +300,10 @@ const UserManagement = () => {
                 نام کاربری
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                ایمیل
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 نقش
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 وضعیت
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                احراز هویت
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 عملیات
@@ -316,9 +311,15 @@ const UserManagement = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {filteredUsers.length === 0 ? (
+            {isLoading ? (
               <tr>
-                <td colSpan={7} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={5} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                  در حال بارگذاری...
+                </td>
+              </tr>
+            ) : filteredUsers.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                   کاربری یافت نشد
                 </td>
               </tr>
@@ -332,9 +333,6 @@ const UserManagement = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {user.username}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {user.email}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 rounded-full text-xs ${getRoleBadgeColor(user.role)}`}>
                       {getRoleName(user.role)}
@@ -347,29 +345,20 @@ const UserManagement = () => {
                       {user.active ? 'فعال' : 'غیرفعال'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded-full text-xs ${user.auth_user_id ? 
-                      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 
-                      'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
-                      {user.auth_user_id ? 'دارد' : 'ندارد'}
-                    </span>
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                     <div className="flex items-center justify-end space-x-reverse space-x-2">
-                      {user.auth_user_id && (
-                        <button
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setNewPassword('');
-                            setConfirmPassword('');
-                            setShowPasswordModal(true);
-                          }}
-                          className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-yellow-600 dark:text-yellow-400"
-                          title="تغییر رمز عبور"
-                        >
-                          <Key size={18} />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setNewPassword('');
+                          setConfirmPassword('');
+                          setShowPasswordModal(true);
+                        }}
+                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-yellow-600 dark:text-yellow-400"
+                        title="تغییر رمز عبور"
+                      >
+                        <Key size={18} />
+                      </button>
                       <button
                         onClick={() => handleEdit(user)}
                         className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400"
@@ -447,23 +436,6 @@ const UserManagement = () => {
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     کاربران می‌توانند با این نام کاربری وارد شوند
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    ایمیل
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="input"
-                    required
-                    placeholder="user@example.com"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    برای احراز هویت در Supabase استفاده می‌شود
                   </p>
                 </div>
 
@@ -689,6 +661,7 @@ const UserManagement = () => {
                   <Button
                     type="submit"
                     variant="primary"
+                    isLoading={isLoading}
                   >
                     {editingUser ? 'به‌روزرسانی' : 'ایجاد کاربر'}
                   </Button>
