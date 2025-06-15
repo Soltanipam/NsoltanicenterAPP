@@ -9,3 +9,19 @@ export const uploadFile = async (file: File, path: string): Promise<string | nul
     return null;
   }
 };
+
+// Compatibility functions for existing code
+export const supabase = {
+  storage: {
+    from: (bucket: string) => ({
+      upload: async (path: string, file: File) => {
+        try {
+          const url = await googleDriveService.uploadFile(file, bucket);
+          return { data: { path: url }, error: null };
+        } catch (error) {
+          return { data: null, error };
+        }
+      }
+    })
+  }
+};

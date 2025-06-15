@@ -1,12 +1,13 @@
-import { googleAuthService } from './googleAuth';
-import { GOOGLE_CONFIG } from '../config/googleConfig';
-
 class GoogleDriveService {
   private baseUrl = 'https://www.googleapis.com/drive/v3';
   private uploadUrl = 'https://www.googleapis.com/upload/drive/v3';
 
+  private getAccessToken(): string | null {
+    return localStorage.getItem('google_access_token');
+  }
+
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const token = googleAuthService.getAccessToken();
+    const token = this.getAccessToken();
     if (!token) {
       throw new Error('کاربر احراز هویت نشده است');
     }
@@ -30,13 +31,13 @@ class GoogleDriveService {
 
   async uploadFile(file: File, folderName?: string): Promise<string> {
     try {
-      const token = googleAuthService.getAccessToken();
+      const token = this.getAccessToken();
       if (!token) {
         throw new Error('کاربر احراز هویت نشده است');
       }
 
       // ایجاد فولدر در صورت نیاز
-      let folderId = GOOGLE_CONFIG.DRIVE_FOLDER_ID;
+      let folderId = 'root';
       if (folderName) {
         folderId = await this.createOrGetFolder(folderName, folderId);
       }

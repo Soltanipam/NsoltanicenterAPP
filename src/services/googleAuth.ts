@@ -1,5 +1,3 @@
-import { GOOGLE_CLIENT_CONFIG } from '../config/googleConfig';
-
 export interface GoogleUser {
   id: string;
   email: string;
@@ -40,8 +38,8 @@ class GoogleAuthService {
     try {
       // ایجاد URL احراز هویت Google OAuth
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-      authUrl.searchParams.set('client_id', GOOGLE_CLIENT_CONFIG.client_id);
-      authUrl.searchParams.set('redirect_uri', GOOGLE_CLIENT_CONFIG.redirect_uri);
+      authUrl.searchParams.set('client_id', 'YOUR_GOOGLE_CLIENT_ID');
+      authUrl.searchParams.set('redirect_uri', window.location.origin + '/auth/callback');
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('scope', 'openid email profile https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file');
       authUrl.searchParams.set('access_type', 'offline');
@@ -65,11 +63,11 @@ class GoogleAuthService {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          client_id: GOOGLE_CLIENT_CONFIG.client_id,
-          client_secret: 'your-client-secret', // باید از متغیر محیطی خوانده شود
+          client_id: 'YOUR_GOOGLE_CLIENT_ID',
+          client_secret: 'YOUR_GOOGLE_CLIENT_SECRET',
           code,
           grant_type: 'authorization_code',
-          redirect_uri: GOOGLE_CLIENT_CONFIG.redirect_uri,
+          redirect_uri: window.location.origin + '/auth/callback',
         }),
       });
 

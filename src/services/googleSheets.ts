@@ -1,20 +1,22 @@
-import { GOOGLE_CONFIG } from '../config/googleConfig';
-import { googleAuthService } from './googleAuth';
-
 export interface SheetRow {
   [key: string]: string | number | boolean | null;
 }
 
 class GoogleSheetsService {
   private baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+  private spreadsheetId = '16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w';
+
+  private getAccessToken(): string | null {
+    return localStorage.getItem('google_access_token');
+  }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const token = googleAuthService.getAccessToken();
+    const token = this.getAccessToken();
     if (!token) {
       throw new Error('کاربر احراز هویت نشده است');
     }
 
-    const response = await fetch(`${this.baseUrl}/${GOOGLE_CONFIG.SPREADSHEET_ID}${endpoint}`, {
+    const response = await fetch(`${this.baseUrl}/${this.spreadsheetId}${endpoint}`, {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -55,7 +57,7 @@ class GoogleSheetsService {
     }
   }
 
-  async appendRow(sheetName: string, data: SheetRow): Promise<void> {
+  async appendRow(sheetName: string, data: SheetRow): Promise<SheetRow> {
     try {
       // ابتدا headers را دریافت کنیم
       const headersResponse = await this.makeRequest(`/values/${sheetName}!1:1`);
@@ -73,6 +75,11 @@ class GoogleSheetsService {
         headers.push(...newHeaders);
       }
 
+      // ID ایجاد کنیم اگر وجود نداشت
+      if (!data.id) {
+        data.id = this.generateId();
+      }
+
       // داده‌ها را بر اساس ترتیب headers مرتب کنیم
       const values = headers.map((header: string) => data[header] || '');
 
@@ -83,36 +90,60 @@ class GoogleSheetsService {
           values: [values]
         })
       });
+
+      return data;
     } catch (error) {
       console.error(`Error appending row to sheet ${sheetName}:`, error);
       throw error;
     }
   }
 
-  async updateRow(sheetName: string, rowIndex: number, data: SheetRow): Promise<void> {
+  async updateRow(sheetName: string, id: string, data: Partial<SheetRow>): Promise<SheetRow> {
     try {
+      // ابتدا ردیف مورد نظر را پیدا کنیم
+      const allData = await this.getSheetData(sheetName);
+      const rowIndex = allData.findIndex(row => row.id === id);
+      
+      if (rowIndex === -1) {
+        throw new Error(`Row with id ${id} not found`);
+      }
+
       // Headers را دریافت کنیم
       const headersResponse = await this.makeRequest(`/values/${sheetName}!1:1`);
       const headers = headersResponse.values?.[0] || [];
 
-      // داده‌ها را بر اساس ترتیب headers مرتب کنیم
-      const values = headers.map((header: string) => data[header] || '');
+      // داده‌های موجود را با داده‌های جدید ترکیب کنیم
+      const existingData = allData[rowIndex];
+      const updatedData = { ...existingData, ...data };
 
-      const range = `${sheetName}!A${rowIndex + 1}:${this.getColumnLetter(headers.length)}${rowIndex + 1}`;
+      // داده‌ها را بر اساس ترتیب headers مرتب کنیم
+      const values = headers.map((header: string) => updatedData[header] || '');
+
+      const range = `${sheetName}!A${rowIndex + 2}:${this.getColumnLetter(headers.length)}${rowIndex + 2}`;
       await this.makeRequest(`/values/${range}`, {
         method: 'PUT',
         body: JSON.stringify({
           values: [values]
         })
       });
+
+      return updatedData;
     } catch (error) {
       console.error(`Error updating row in sheet ${sheetName}:`, error);
       throw error;
     }
   }
 
-  async deleteRow(sheetName: string, rowIndex: number): Promise<void> {
+  async deleteRow(sheetName: string, id: string): Promise<void> {
     try {
+      // ابتدا ردیف مورد نظر را پیدا کنیم
+      const allData = await this.getSheetData(sheetName);
+      const rowIndex = allData.findIndex(row => row.id === id);
+      
+      if (rowIndex === -1) {
+        throw new Error(`Row with id ${id} not found`);
+      }
+
       // ابتدا sheet ID را دریافت کنیم
       const sheetInfo = await this.makeRequest('');
       const sheet = sheetInfo.sheets.find((s: any) => s.properties.title === sheetName);
@@ -131,8 +162,8 @@ class GoogleSheetsService {
               range: {
                 sheetId: sheetId,
                 dimension: 'ROWS',
-                startIndex: rowIndex,
-                endIndex: rowIndex + 1
+                startIndex: rowIndex + 1, // +1 برای header
+                endIndex: rowIndex + 2
               }
             }
           }]
@@ -140,22 +171,6 @@ class GoogleSheetsService {
       });
     } catch (error) {
       console.error(`Error deleting row from sheet ${sheetName}:`, error);
-      throw error;
-    }
-  }
-
-  async findRowByField(sheetName: string, field: string, value: any): Promise<{ row: SheetRow; index: number } | null> {
-    try {
-      const data = await this.getSheetData(sheetName);
-      const index = data.findIndex(row => row[field] === value);
-      
-      if (index === -1) {
-        return null;
-      }
-
-      return { row: data[index], index: index + 1 }; // +1 چون header در نظر گرفته می‌شود
-    } catch (error) {
-      console.error(`Error finding row in sheet ${sheetName}:`, error);
       throw error;
     }
   }
@@ -170,90 +185,102 @@ class GoogleSheetsService {
     return result;
   }
 
+  private generateId(): string {
+    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+  }
+
   // متدهای مخصوص هر جدول
   async getUsers(): Promise<SheetRow[]> {
-    return this.getSheetData(GOOGLE_CONFIG.SHEETS.USERS);
+    return this.getSheetData('users');
   }
 
-  async addUser(user: SheetRow): Promise<void> {
-    user.id = this.generateId();
-    user.created_at = new Date().toISOString();
-    return this.appendRow(GOOGLE_CONFIG.SHEETS.USERS, user);
+  async addUser(user: SheetRow): Promise<SheetRow> {
+    user.created_at = new Date().toLocaleDateString('fa-IR');
+    user.updated_at = new Date().toLocaleDateString('fa-IR');
+    return this.appendRow('users', user);
   }
 
-  async updateUser(id: string, updates: Partial<SheetRow>): Promise<void> {
-    const result = await this.findRowByField(GOOGLE_CONFIG.SHEETS.USERS, 'id', id);
-    if (!result) {
-      throw new Error('کاربر یافت نشد');
-    }
-
-    const updatedData = { ...result.row, ...updates, updated_at: new Date().toISOString() };
-    return this.updateRow(GOOGLE_CONFIG.SHEETS.USERS, result.index, updatedData);
+  async updateUser(id: string, updates: Partial<SheetRow>): Promise<SheetRow> {
+    updates.updated_at = new Date().toLocaleDateString('fa-IR');
+    return this.updateRow('users', id, updates);
   }
 
   async deleteUser(id: string): Promise<void> {
-    const result = await this.findRowByField(GOOGLE_CONFIG.SHEETS.USERS, 'id', id);
-    if (!result) {
-      throw new Error('کاربر یافت نشد');
-    }
-
-    return this.deleteRow(GOOGLE_CONFIG.SHEETS.USERS, result.index);
+    return this.deleteRow('users', id);
   }
 
-  // متدهای مشابه برای سایر جداول
   async getCustomers(): Promise<SheetRow[]> {
-    return this.getSheetData(GOOGLE_CONFIG.SHEETS.CUSTOMERS);
+    return this.getSheetData('customers');
   }
 
-  async addCustomer(customer: SheetRow): Promise<void> {
-    customer.id = this.generateId();
-    customer.created_at = new Date().toISOString();
-    return this.appendRow(GOOGLE_CONFIG.SHEETS.CUSTOMERS, customer);
+  async addCustomer(customer: SheetRow): Promise<SheetRow> {
+    customer.created_at = new Date().toLocaleDateString('fa-IR');
+    customer.updated_at = new Date().toLocaleDateString('fa-IR');
+    return this.appendRow('customers', customer);
+  }
+
+  async updateCustomer(id: string, updates: Partial<SheetRow>): Promise<SheetRow> {
+    updates.updated_at = new Date().toLocaleDateString('fa-IR');
+    return this.updateRow('customers', id, updates);
+  }
+
+  async deleteCustomer(id: string): Promise<void> {
+    return this.deleteRow('customers', id);
   }
 
   async getReceptions(): Promise<SheetRow[]> {
-    return this.getSheetData(GOOGLE_CONFIG.SHEETS.RECEPTIONS);
+    return this.getSheetData('receptions');
   }
 
-  async addReception(reception: SheetRow): Promise<void> {
-    reception.id = this.generateId();
-    reception.created_at = new Date().toISOString();
-    return this.appendRow(GOOGLE_CONFIG.SHEETS.RECEPTIONS, reception);
+  async addReception(reception: SheetRow): Promise<SheetRow> {
+    reception.created_at = new Date().toLocaleDateString('fa-IR');
+    reception.updated_at = new Date().toLocaleDateString('fa-IR');
+    return this.appendRow('receptions', reception);
+  }
+
+  async updateReception(id: string, updates: Partial<SheetRow>): Promise<SheetRow> {
+    updates.updated_at = new Date().toLocaleDateString('fa-IR');
+    return this.updateRow('receptions', id, updates);
+  }
+
+  async deleteReception(id: string): Promise<void> {
+    return this.deleteRow('receptions', id);
   }
 
   async getTasks(): Promise<SheetRow[]> {
-    return this.getSheetData(GOOGLE_CONFIG.SHEETS.TASKS);
+    return this.getSheetData('tasks');
   }
 
-  async addTask(task: SheetRow): Promise<void> {
-    task.id = this.generateId();
-    task.created_at = new Date().toISOString();
-    task.updated_at = new Date().toISOString();
-    return this.appendRow(GOOGLE_CONFIG.SHEETS.TASKS, task);
+  async addTask(task: SheetRow): Promise<SheetRow> {
+    task.created_at = new Date().toLocaleDateString('fa-IR');
+    task.updated_at = new Date().toLocaleDateString('fa-IR');
+    return this.appendRow('tasks', task);
   }
 
-  async updateTask(id: string, updates: Partial<SheetRow>): Promise<void> {
-    const result = await this.findRowByField(GOOGLE_CONFIG.SHEETS.TASKS, 'id', id);
-    if (!result) {
-      throw new Error('وظیفه یافت نشد');
-    }
+  async updateTask(id: string, updates: Partial<SheetRow>): Promise<SheetRow> {
+    updates.updated_at = new Date().toLocaleDateString('fa-IR');
+    return this.updateRow('tasks', id, updates);
+  }
 
-    const updatedData = { ...result.row, ...updates, updated_at: new Date().toISOString() };
-    return this.updateRow(GOOGLE_CONFIG.SHEETS.TASKS, result.index, updatedData);
+  async deleteTask(id: string): Promise<void> {
+    return this.deleteRow('tasks', id);
   }
 
   async getMessages(): Promise<SheetRow[]> {
-    return this.getSheetData(GOOGLE_CONFIG.SHEETS.MESSAGES);
+    return this.getSheetData('messages');
   }
 
-  async addMessage(message: SheetRow): Promise<void> {
-    message.id = this.generateId();
-    message.date = new Date().toISOString();
-    return this.appendRow(GOOGLE_CONFIG.SHEETS.MESSAGES, message);
+  async addMessage(message: SheetRow): Promise<SheetRow> {
+    message.created_at = new Date().toLocaleDateString('fa-IR');
+    return this.appendRow('messages', message);
   }
 
-  private generateId(): string {
-    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+  async updateMessage(id: string, updates: Partial<SheetRow>): Promise<SheetRow> {
+    return this.updateRow('messages', id, updates);
+  }
+
+  async deleteMessage(id: string): Promise<void> {
+    return this.deleteRow('messages', id);
   }
 }
 
