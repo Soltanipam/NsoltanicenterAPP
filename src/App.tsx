@@ -108,7 +108,7 @@ function App() {
           {/* Staff Login */}
           <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} />
           
-          {/* Google OAuth Callback */}
+          {/* Google OAuth Callback - Deprecated but kept for compatibility */}
           <Route path="/auth/callback" element={<GoogleCallback />} />
           
           {/* Customer Login */}
