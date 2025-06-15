@@ -149,7 +149,8 @@ export const useAuthStore = create<AuthState>()(
                   jobDescription: user.job_description,
                   permissions: typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || {}),
                   settings: typeof user.settings === 'string' ? JSON.parse(user.settings) : (user.settings || { sidebarOpen: true }),
-                  active: user.active === 'true'
+                  active: user.active === 'true',
+                  auth_user_id: user.id // Use the same ID for compatibility
                 };
                 
                 offlineSyncService.cacheData('current_user', userForAuth);
