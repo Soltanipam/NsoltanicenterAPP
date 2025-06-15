@@ -34,6 +34,83 @@ const defaultPermissions: UserPermissions = {
   canViewHistory: false
 };
 
+// Helper function to safely parse permissions
+const parsePermissions = (permissionsData: any): UserPermissions => {
+  // If it's already an object, return it
+  if (typeof permissionsData === 'object' && permissionsData !== null) {
+    return { ...defaultPermissions, ...permissionsData };
+  }
+  
+  // If it's a string, try to parse it as JSON
+  if (typeof permissionsData === 'string') {
+    // If it's empty or just whitespace, return default permissions
+    if (!permissionsData.trim()) {
+      return defaultPermissions;
+    }
+    
+    try {
+      const parsed = JSON.parse(permissionsData);
+      return { ...defaultPermissions, ...parsed };
+    } catch (error) {
+      // If JSON parsing fails, check if it's a role-based string
+      console.warn('Failed to parse permissions JSON, falling back to role-based permissions:', permissionsData);
+      
+      // Handle role-based permissions for backward compatibility
+      const rolePermissions = getRoleBasedPermissions(permissionsData);
+      return rolePermissions;
+    }
+  }
+  
+  // Fallback to default permissions
+  return defaultPermissions;
+};
+
+// Helper function to get permissions based on role
+const getRoleBasedPermissions = (role: string): UserPermissions => {
+  switch (role.toLowerCase()) {
+    case 'admin':
+      return {
+        canViewReceptions: true,
+        canCreateTask: true,
+        canCreateReception: true,
+        canCompleteServices: true,
+        canManageCustomers: true,
+        canViewHistory: true
+      };
+    case 'receptionist':
+      return {
+        canViewReceptions: true,
+        canCreateTask: true,
+        canCreateReception: true,
+        canCompleteServices: false,
+        canManageCustomers: true,
+        canViewHistory: true
+      };
+    case 'technician':
+      return {
+        canViewReceptions: true,
+        canCreateTask: false,
+        canCreateReception: false,
+        canCompleteServices: true,
+        canManageCustomers: false,
+        canViewHistory: true
+      };
+    case 'warehouse':
+    case 'detailing':
+    case 'accountant':
+      return {
+        canViewReceptions: true,
+        canCreateTask: false,
+        canCreateReception: false,
+        canCompleteServices: true,
+        canManageCustomers: false,
+        canViewHistory: true
+      };
+    default:
+      return defaultPermissions;
+  }
+};
+
 interface UserStore {
   users: User[];
   isLoading: boolean;
@@ -72,7 +149,7 @@ export const useUserStore = create<UserStore>()(
             role: user.role,
             jobDescription: user.job_description,
             active: user.active === 'true' || user.active === true,
-            permissions: typeof user.permissions === 'string' ? JSON.parse(user.permissions || '{}') : (user.permissions || defaultPermissions),
+            permissions: parsePermissions(user.permissions),
             password: user.password,
             auth_user_id: user.auth_user_id
           }));
@@ -95,7 +172,7 @@ export const useUserStore = create<UserStore>()(
               role: user.role,
               jobDescription: user.job_description,
               active: user.active === 'true' || user.active === true,
-              permissions: typeof user.permissions === 'string' ? JSON.parse(user.permissions || '{}') : (user.permissions || defaultPermissions),
+              permissions: parsePermissions(user.permissions),
               password: user.password,
               auth_user_id: user.auth_user_id
             }));
@@ -146,7 +223,7 @@ export const useUserStore = create<UserStore>()(
             role: newUser.role,
             jobDescription: newUser.job_description,
             active: newUser.active === 'true',
-            permissions: JSON.parse(newUser.permissions || '{}'),
+            permissions: parsePermissions(newUser.permissions),
             auth_user_id: newUser.auth_user_id
           };
           
@@ -191,7 +268,7 @@ export const useUserStore = create<UserStore>()(
               role: updatedUser.role,
               jobDescription: updatedUser.job_description,
               active: updatedUser.active === 'true',
-              permissions: JSON.parse(updatedUser.permissions || '{}'),
+              permissions: parsePermissions(updatedUser.permissions),
               auth_user_id: updatedUser.auth_user_id
             } : u),
             isLoading: false
