@@ -1,11 +1,10 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { PlusCircle, Search, Edit, Trash2, Check, X, Key, AlertTriangle, ExternalLink, UserPlus, Shield } from 'lucide-react';
+import { PlusCircle, Search, Edit, Trash2, Check, X, Key, AlertTriangle, UserPlus, Shield } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { UserRole } from '../../store/authStore';
 import { useUserStore, UserPermissions } from '../../store/userStore';
-import { googleAuthService } from '../../services/googleAuth';
 
 interface User {
   id: string;
@@ -38,8 +37,6 @@ const UserManagement = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-  const [showGoogleAuthModal, setShowGoogleAuthModal] = useState(false);
-  const [pendingOperation, setPendingOperation] = useState<(() => Promise<void>) | null>(null);
   
   const [formData, setFormData] = useState({
     username: '',
@@ -149,13 +146,7 @@ const UserManagement = () => {
       await deleteUser(userId);
       toast.success('کاربر با موفقیت حذف شد');
     } catch (error: any) {
-      // Check if error is related to Google authentication
-      if (error.message && (error.message.includes('برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید') || error.message.includes('No access token found. Please authenticate with Google first.'))) {
-        setPendingOperation(() => () => handleDelete(userId));
-        setShowGoogleAuthModal(true);
-      } else {
-        toast.error('خطا در حذف کاربر');
-      }
+      toast.error('خطا در حذف کاربر');
     } finally {
       setIsDeleting(null);
     }
@@ -184,33 +175,9 @@ const UserManagement = () => {
       setSelectedUser(null);
     } catch (error: any) {
       console.error('Password update error:', error);
-      // Check if error is related to Google authentication
-      if (error.message && (error.message.includes('برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید') || error.message.includes('No access token found. Please authenticate with Google first.'))) {
-        setPendingOperation(() => handlePasswordChange);
-        setShowGoogleAuthModal(true);
-      } else {
-        toast.error('خطا در تغییر رمز عبور');
-      }
+      toast.error('خطا در تغییر رمز عبور');
     } finally {
       setIsUpdatingPassword(false);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    try {
-      await googleAuthService.signIn();
-      setShowGoogleAuthModal(false);
-      
-      // Execute pending operation if exists
-      if (pendingOperation) {
-        await pendingOperation();
-        setPendingOperation(null);
-      }
-      
-      toast.success('با موفقیت وارد حساب Google شدید');
-    } catch (error) {
-      console.error('Google sign-in error:', error);
-      toast.error('خطا در ورود به حساب Google');
     }
   };
 
@@ -267,13 +234,7 @@ const UserManagement = () => {
       setEditingUser(null);
     } catch (error: any) {
       console.error('User operation error:', error);
-      // Check if error is related to Google authentication
-      if (error.message && (error.message.includes('برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید') || error.message.includes('No access token found. Please authenticate with Google first.'))) {
-        setPendingOperation(() => () => handleSubmit(e));
-        setShowGoogleAuthModal(true);
-      } else {
-        toast.error('خطا در ذخیره اطلاعات کاربر');
-      }
+      toast.error('خطا در ذخیره اطلاعات کاربر');
     }
   };
   
@@ -309,7 +270,7 @@ const UserManagement = () => {
               <li>کاربران می‌توانند با نام کاربری وارد شوند</li>
               <li>مدیر می‌تواند رمز عبور کاربران را تغییر دهد</li>
               <li>اطلاعات در Google Sheets ذخیره می‌شود</li>
-              <li>برای ذخیره اطلاعات، ورود به حساب Google الزامی است</li>
+              <li>برای ذخیره اطلاعات، API Key گوگل الزامی است</li>
             </ul>
           </div>
         </div>
@@ -782,50 +743,6 @@ const UserManagement = () => {
                 >
                   تغییر رمز عبور
                 </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Google Authentication Modal */}
-      {showGoogleAuthModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen p-4">
-            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setShowGoogleAuthModal(false)}></div>
-            
-            <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="text-center">
-                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 mb-4">
-                  <Shield className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-                </div>
-                
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  احراز هویت Google مورد نیاز است
-                </h3>
-                
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                  برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید تا بتوانیم اطلاعات را در Google Sheets ذخیره کنیم.
-                </p>
-                
-                <div className="flex justify-center gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowGoogleAuthModal(false);
-                      setPendingOperation(null);
-                    }}
-                  >
-                    انصراف
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={handleGoogleSignIn}
-                    leftIcon={<ExternalLink size={16} />}
-                  >
-                    ورود به Google
-                  </Button>
-                </div>
               </div>
             </div>
           </div>

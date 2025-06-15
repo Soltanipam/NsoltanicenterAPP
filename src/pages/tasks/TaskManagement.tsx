@@ -6,7 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useTaskStore, Task } from '../../store/taskStore';
 import { useReceptionStore } from '../../store/receptionStore';
 import { useUserStore } from '../../store/userStore';
-import { uploadFile } from '../../lib/supabase';
+import { googleDriveService } from '../../services/googleDrive';
 import { toast } from 'react-hot-toast';
 
 const TaskManagement = () => {
@@ -79,12 +79,6 @@ const TaskManagement = () => {
 
     if (!vehicle || !assignedUser) {
       toast.error('اطلاعات نامعتبر');
-      return;
-    }
-
-    // Check if user has auth_user_id for RLS compatibility
-    if (!assignedUser.auth_user_id) {
-      toast.error('کاربر انتخاب شده هنوز اکانت احراز هویت ندارد. لطفاً ابتدا از بخش مدیریت کاربران، اکانت احراز هویت برای این کاربر ایجاد کنید.');
       return;
     }
 
@@ -561,15 +555,9 @@ const TaskManagement = () => {
                                  u.role === 'warehouse' ? 'انباردار' :
                                  u.role === 'detailing' ? 'دیتیلینگ' :
                                  u.role === 'accountant' ? 'حسابدار' : u.role})
-                        {!u.auth_user_id && ' (بدون اکانت احراز هویت)'}
                       </option>
                     ))}
                   </select>
-                  {formData.assignedTo && !availableUsers.find(u => u.id === formData.assignedTo)?.auth_user_id && (
-                    <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
-                      ⚠️ این کاربر هنوز اکانت احراز هویت ندارد. برای ایجاد وظیفه، ابتدا از بخش مدیریت کاربران اکانت احراز هویت ایجاد کنید.
-                    </p>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
