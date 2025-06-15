@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { googleSheetsService } from '../services/googleSheets';
 
 export interface Customer {
   id: string;
@@ -13,49 +14,9 @@ export interface Customer {
   updatedAt: string;
 }
 
-// مشتریان نمونه برای تست
-const SAMPLE_CUSTOMERS: Customer[] = [
-  {
-    id: 'customer-1',
-    customerId: '100001',
-    firstName: 'احمد',
-    lastName: 'محمدی',
-    phone: '09123456789',
-    email: 'ahmad@example.com',
-    canLogin: true,
-    createdAt: '1403/10/01',
-    updatedAt: '1403/10/01'
-  },
-  {
-    id: 'customer-2',
-    customerId: '100002',
-    firstName: 'علی',
-    lastName: 'رضایی',
-    phone: '09123456788',
-    email: 'ali@example.com',
-    canLogin: true,
-    createdAt: '1403/10/02',
-    updatedAt: '1403/10/02'
-  },
-  {
-    id: 'customer-3',
-    customerId: '100003',
-    firstName: 'مریم',
-    lastName: 'احمدی',
-    phone: '09123456787',
-    email: 'maryam@example.com',
-    canLogin: false,
-    createdAt: '1403/10/03',
-    updatedAt: '1403/10/03'
-  }
-];
-
 // Generate a unique customer ID
 const generateCustomerId = (): string => {
-  const existingIds = JSON.parse(localStorage.getItem('customers-storage') || '{"state":{"customers":[]}}')
-    .state.customers.map((c: Customer) => parseInt(c.customerId));
-  const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 100000;
-  return (maxId + 1).toString();
+  return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
 interface CustomerStore {
@@ -77,7 +38,7 @@ interface CustomerStore {
 export const useCustomerStore = create<CustomerStore>()(
   persist(
     (set, get) => ({
-      customers: SAMPLE_CUSTOMERS,
+      customers: [],
       isLoading: false,
       error: null,
 
@@ -85,24 +46,28 @@ export const useCustomerStore = create<CustomerStore>()(
         set({ isLoading: true, error: null });
 
         try {
-          // در حال حاضر از مشتریان نمونه استفاده می‌کنیم
-          // در آینده می‌توان اتصال به Google Sheets را اضافه کرد
-          const storedCustomers = localStorage.getItem('customers-storage');
-          if (storedCustomers) {
-            const parsed = JSON.parse(storedCustomers);
-            if (parsed.state?.customers && Array.isArray(parsed.state.customers)) {
-              set({ customers: parsed.state.customers, isLoading: false });
-              return;
-            }
-          }
+          console.log('Loading customers from Google Sheets...');
+          const customersData = await googleSheetsService.getCustomers();
+          
+          const customers: Customer[] = customersData.map(customer => ({
+            id: customer.id,
+            customerId: customer.code,
+            firstName: customer.name.split(' ')[0] || '',
+            lastName: customer.name.split(' ').slice(1).join(' ') || '',
+            phone: customer.phone,
+            email: customer.email || '',
+            canLogin: customer.online_access === 'true',
+            createdAt: customer.created_at || new Date().toLocaleDateString('fa-IR'),
+            updatedAt: customer.updated_at || new Date().toLocaleDateString('fa-IR')
+          }));
 
-          set({ customers: SAMPLE_CUSTOMERS, isLoading: false });
+          set({ customers, isLoading: false });
+          console.log('Customers loaded successfully from Google Sheets:', customers.length);
         } catch (error: any) {
-          console.error('Error loading customers:', error);
+          console.error('Error loading customers from Google Sheets:', error);
           set({ 
-            customers: SAMPLE_CUSTOMERS,
             isLoading: false, 
-            error: 'خطا در بارگذاری مشتریان - از مشتریان نمونه استفاده می‌شود' 
+            error: 'خطا در بارگذاری مشتریان از Google Sheets: ' + error.message 
           });
         }
       },
@@ -115,18 +80,31 @@ export const useCustomerStore = create<CustomerStore>()(
         set({ isLoading: true, error: null });
 
         try {
+          console.log('Adding customer to Google Sheets:', customer);
           const customerId = generateCustomerId();
           
+          const newCustomerData = {
+            code: customerId,
+            name: `${customer.firstName} ${customer.lastName}`,
+            phone: customer.phone,
+            email: customer.email || '',
+            online_access: customer.canLogin ? 'true' : 'false',
+            created_at: new Date().toLocaleDateString('fa-IR'),
+            updated_at: new Date().toLocaleDateString('fa-IR')
+          };
+
+          const newCustomer = await googleSheetsService.addCustomer(newCustomerData);
+
           const customerForStore: Customer = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            customerId: customerId,
+            id: newCustomer.id,
+            customerId: newCustomer.code,
             firstName: customer.firstName,
             lastName: customer.lastName,
-            phone: customer.phone,
-            email: customer.email,
-            canLogin: customer.canLogin,
-            createdAt: new Date().toLocaleDateString('fa-IR'),
-            updatedAt: new Date().toLocaleDateString('fa-IR')
+            phone: newCustomer.phone,
+            email: newCustomer.email,
+            canLogin: newCustomer.online_access === 'true',
+            createdAt: newCustomer.created_at,
+            updatedAt: newCustomer.updated_at
           };
 
           set(state => ({
@@ -134,13 +112,14 @@ export const useCustomerStore = create<CustomerStore>()(
             isLoading: false
           }));
 
+          console.log('Customer added successfully to Google Sheets');
           return customerForStore;
 
         } catch (error: any) {
-          console.error('Error adding customer:', error);
+          console.error('Error adding customer to Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: error.message || 'خطا در افزودن مشتری' 
+            error: 'خطا در افزودن مشتری به Google Sheets: ' + error.message 
           });
           throw error;
         }
@@ -156,20 +135,47 @@ export const useCustomerStore = create<CustomerStore>()(
         set({ isLoading: true, error: null });
 
         try {
+          console.log('Updating customer in Google Sheets:', id, updates);
+          
+          const updateData: any = {};
+          
+          if (updates.firstName !== undefined || updates.lastName !== undefined) {
+            const currentCustomer = get().customers.find(c => c.id === id);
+            const firstName = updates.firstName ?? currentCustomer?.firstName ?? '';
+            const lastName = updates.lastName ?? currentCustomer?.lastName ?? '';
+            updateData.name = `${firstName} ${lastName}`;
+          }
+          if (updates.phone !== undefined) updateData.phone = updates.phone;
+          if (updates.email !== undefined) updateData.email = updates.email;
+          if (updates.canLogin !== undefined) updateData.online_access = updates.canLogin ? 'true' : 'false';
+          updateData.updated_at = new Date().toLocaleDateString('fa-IR');
+
+          const updatedCustomer = await googleSheetsService.updateCustomer(id, updateData);
+
+          const customerForStore: Customer = {
+            id: updatedCustomer.id,
+            customerId: updatedCustomer.code,
+            firstName: updates.firstName ?? get().customers.find(c => c.id === id)?.firstName ?? '',
+            lastName: updates.lastName ?? get().customers.find(c => c.id === id)?.lastName ?? '',
+            phone: updatedCustomer.phone,
+            email: updatedCustomer.email,
+            canLogin: updatedCustomer.online_access === 'true',
+            createdAt: updatedCustomer.created_at,
+            updatedAt: updatedCustomer.updated_at
+          };
+
           set(state => ({
-            customers: state.customers.map(c => c.id === id ? {
-              ...c,
-              ...updates,
-              updatedAt: new Date().toLocaleDateString('fa-IR')
-            } : c),
+            customers: state.customers.map(c => c.id === id ? customerForStore : c),
             isLoading: false
           }));
 
+          console.log('Customer updated successfully in Google Sheets');
+
         } catch (error: any) {
-          console.error('Error updating customer:', error);
+          console.error('Error updating customer in Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در به‌روزرسانی مشتری' 
+            error: 'خطا در به‌روزرسانی مشتری در Google Sheets: ' + error.message 
           });
           throw error;
         }
@@ -185,16 +191,22 @@ export const useCustomerStore = create<CustomerStore>()(
         set({ isLoading: true, error: null });
 
         try {
+          console.log('Deleting customer from Google Sheets:', id);
+          
+          await googleSheetsService.deleteCustomer(id);
+
           set(state => ({
             customers: state.customers.filter(c => c.id !== id),
             isLoading: false
           }));
 
+          console.log('Customer deleted successfully from Google Sheets');
+
         } catch (error: any) {
-          console.error('Error deleting customer:', error);
+          console.error('Error deleting customer from Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در حذف مشتری' 
+            error: 'خطا در حذف مشتری از Google Sheets: ' + error.message 
           });
           throw error;
         }

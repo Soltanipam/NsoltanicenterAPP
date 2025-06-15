@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { googleSheetsService } from '../services/googleSheets';
 import bcrypt from 'bcryptjs';
 
 export interface UserPermissions {
@@ -32,58 +33,6 @@ const defaultPermissions: UserPermissions = {
   canViewHistory: false
 };
 
-// کاربران پیش‌فرض سیستم
-const DEFAULT_USERS: User[] = [
-  {
-    id: 'admin-default',
-    username: 'admin',
-    name: 'مدیر سیستم',
-    role: 'admin',
-    jobDescription: 'مدیر کل سیستم',
-    active: true,
-    permissions: {
-      canViewReceptions: true,
-      canCreateTask: true,
-      canCreateReception: true,
-      canCompleteServices: true,
-      canManageCustomers: true,
-      canViewHistory: true
-    }
-  },
-  {
-    id: 'receptionist-1',
-    username: 'reception',
-    name: 'کارشناس پذیرش',
-    role: 'receptionist',
-    jobDescription: 'مسئول پذیرش خودرو',
-    active: true,
-    permissions: {
-      canViewReceptions: true,
-      canCreateTask: true,
-      canCreateReception: true,
-      canCompleteServices: false,
-      canManageCustomers: true,
-      canViewHistory: true
-    }
-  },
-  {
-    id: 'technician-1',
-    username: 'tech1',
-    name: 'تکنسین اول',
-    role: 'technician',
-    jobDescription: 'تکنسین تعمیرات',
-    active: true,
-    permissions: {
-      canViewReceptions: false,
-      canCreateTask: false,
-      canCreateReception: false,
-      canCompleteServices: false,
-      canManageCustomers: false,
-      canViewHistory: false
-    }
-  }
-];
-
 interface UserStore {
   users: User[];
   isLoading: boolean;
@@ -104,7 +53,7 @@ interface UserStore {
 export const useUserStore = create<UserStore>()(
   persist(
     (set, get) => ({
-      users: DEFAULT_USERS,
+      users: [],
       isLoading: false,
       error: null,
 
@@ -112,24 +61,28 @@ export const useUserStore = create<UserStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          // در حال حاضر از کاربران پیش‌فرض استفاده می‌کنیم
-          // در آینده می‌توان اتصال به Google Sheets را اضافه کرد
-          const storedUsers = localStorage.getItem('users-storage');
-          if (storedUsers) {
-            const parsed = JSON.parse(storedUsers);
-            if (parsed.state?.users && Array.isArray(parsed.state.users)) {
-              set({ users: parsed.state.users, isLoading: false });
-              return;
-            }
-          }
+          console.log('Loading users from Google Sheets...');
+          const usersData = await googleSheetsService.getUsers();
           
-          set({ users: DEFAULT_USERS, isLoading: false });
+          const users: User[] = usersData.map(user => ({
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            role: user.role,
+            jobDescription: user.job_description,
+            active: user.active === 'true' || user.active === true,
+            permissions: typeof user.permissions === 'string' ? JSON.parse(user.permissions || '{}') : (user.permissions || defaultPermissions),
+            password: user.password,
+            auth_user_id: user.auth_user_id
+          }));
+
+          set({ users, isLoading: false });
+          console.log('Users loaded successfully from Google Sheets:', users.length);
         } catch (error: any) {
-          console.error('Error loading users:', error);
+          console.error('Error loading users from Google Sheets:', error);
           set({ 
-            users: DEFAULT_USERS,
             isLoading: false, 
-            error: 'خطا در بارگذاری کاربران - از کاربران پیش‌فرض استفاده می‌شود' 
+            error: 'خطا در بارگذاری کاربران از Google Sheets: ' + error.message 
           });
         }
       },
@@ -138,33 +91,47 @@ export const useUserStore = create<UserStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          console.log('Adding user:', user);
+          console.log('Adding user to Google Sheets:', user);
           
           // Hash password
           const hashedPassword = await bcrypt.hash(user.password, 10);
           
-          const newUser: User = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          const userData = {
             username: user.username,
             name: user.name,
             role: user.role,
-            jobDescription: user.jobDescription || '',
-            active: user.active,
-            permissions: user.permissions || defaultPermissions,
-            password: hashedPassword
+            job_description: user.jobDescription || '',
+            active: user.active ? 'true' : 'false',
+            permissions: JSON.stringify(user.permissions || defaultPermissions),
+            password: hashedPassword,
+            created_at: new Date().toLocaleDateString('fa-IR'),
+            updated_at: new Date().toLocaleDateString('fa-IR')
+          };
+          
+          const newUser = await googleSheetsService.addUser(userData);
+          
+          const userForStore: User = {
+            id: newUser.id,
+            username: newUser.username,
+            name: newUser.name,
+            role: newUser.role,
+            jobDescription: newUser.job_description,
+            active: newUser.active === 'true',
+            permissions: JSON.parse(newUser.permissions || '{}'),
+            auth_user_id: newUser.auth_user_id
           };
           
           set((state) => ({
-            users: [...state.users, newUser],
+            users: [...state.users, userForStore],
             isLoading: false
           }));
           
-          console.log('User created successfully');
-        } catch (error) {
-          console.error('Error adding user:', error);
+          console.log('User created successfully in Google Sheets');
+        } catch (error: any) {
+          console.error('Error adding user to Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در افزودن کاربر' 
+            error: 'خطا در افزودن کاربر به Google Sheets: ' + error.message 
           });
           throw error;
         }
@@ -174,27 +141,39 @@ export const useUserStore = create<UserStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          console.log('Updating user:', id, user);
+          console.log('Updating user in Google Sheets:', id, user);
+          
+          const userData: any = {};
+          if (user.username !== undefined) userData.username = user.username;
+          if (user.name !== undefined) userData.name = user.name;
+          if (user.role !== undefined) userData.role = user.role;
+          if (user.jobDescription !== undefined) userData.job_description = user.jobDescription;
+          if (user.active !== undefined) userData.active = user.active ? 'true' : 'false';
+          if (user.permissions !== undefined) userData.permissions = JSON.stringify(user.permissions);
+          userData.updated_at = new Date().toLocaleDateString('fa-IR');
+          
+          const updatedUser = await googleSheetsService.updateUser(id, userData);
           
           set((state) => ({
             users: state.users.map(u => u.id === id ? {
-              ...u,
-              username: user.username ?? u.username,
-              name: user.name ?? u.name,
-              role: user.role ?? u.role,
-              jobDescription: user.jobDescription ?? u.jobDescription,
-              active: user.active ?? u.active,
-              permissions: user.permissions ?? u.permissions
+              id: updatedUser.id,
+              username: updatedUser.username,
+              name: updatedUser.name,
+              role: updatedUser.role,
+              jobDescription: updatedUser.job_description,
+              active: updatedUser.active === 'true',
+              permissions: JSON.parse(updatedUser.permissions || '{}'),
+              auth_user_id: updatedUser.auth_user_id
             } : u),
             isLoading: false
           }));
           
-          console.log('User updated successfully');
-        } catch (error) {
-          console.error('Error updating user:', error);
+          console.log('User updated successfully in Google Sheets');
+        } catch (error: any) {
+          console.error('Error updating user in Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در به‌روزرسانی کاربر' 
+            error: 'خطا در به‌روزرسانی کاربر در Google Sheets: ' + error.message 
           });
           throw error;
         }
@@ -202,22 +181,20 @@ export const useUserStore = create<UserStore>()(
 
       updatePassword: async (id, newPassword) => {
         try {
-          console.log('Updating user password:', id);
+          console.log('Updating user password in Google Sheets:', id);
           
           // Hash new password
           const hashedPassword = await bcrypt.hash(newPassword, 10);
           
-          set((state) => ({
-            users: state.users.map(u => u.id === id ? {
-              ...u,
-              password: hashedPassword
-            } : u)
-          }));
+          await googleSheetsService.updateUser(id, { 
+            password: hashedPassword,
+            updated_at: new Date().toLocaleDateString('fa-IR')
+          });
           
-          console.log('User password updated successfully');
-        } catch (error) {
-          console.error('Error updating user password:', error);
-          throw error;
+          console.log('User password updated successfully in Google Sheets');
+        } catch (error: any) {
+          console.error('Error updating user password in Google Sheets:', error);
+          throw new Error('خطا در تغییر رمز عبور در Google Sheets: ' + error.message);
         }
       },
       
@@ -225,19 +202,21 @@ export const useUserStore = create<UserStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          console.log('Deleting user:', id);
+          console.log('Deleting user from Google Sheets:', id);
+          
+          await googleSheetsService.deleteUser(id);
           
           set((state) => ({
             users: state.users.filter(u => u.id !== id),
             isLoading: false
           }));
           
-          console.log('User deleted successfully');
-        } catch (error) {
-          console.error('Error deleting user:', error);
+          console.log('User deleted successfully from Google Sheets');
+        } catch (error: any) {
+          console.error('Error deleting user from Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در حذف کاربر' 
+            error: 'خطا در حذف کاربر از Google Sheets: ' + error.message 
           });
           throw error;
         }

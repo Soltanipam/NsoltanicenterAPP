@@ -130,7 +130,7 @@ const Login = () => {
                 <>
                   <Wifi className="h-4 w-4 text-green-500" />
                   <span className="text-sm text-green-600 dark:text-green-400">
-                    متصل
+                    متصل به Google Sheets
                   </span>
                 </>
               )}

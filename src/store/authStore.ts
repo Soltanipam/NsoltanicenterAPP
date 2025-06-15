@@ -226,7 +226,7 @@ export const useAuthStore = create<AuthState>()(
             console.error('Google Sheets error:', error);
             return { 
               success: false, 
-              message: 'خطا در برقراری ارتباط با پایگاه داده' 
+              message: 'خطا در برقراری ارتباط با Google Sheets: ' + (error as Error).message 
             };
           }
 
