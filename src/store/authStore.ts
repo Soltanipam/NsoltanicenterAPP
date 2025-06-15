@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
 import { googleSheetsService } from '../services/googleSheets';
-import { googleAuthService } from '../services/googleAuth';
 import { offlineSyncService } from '../services/offlineSync';
 import bcrypt from 'bcryptjs';
 
@@ -10,7 +9,6 @@ export type UserRole = 'admin' | 'receptionist' | 'technician' | 'warehouse' | '
 
 export interface User {
   id: string;
-  email: string;
   username: string;
   name: string;
   role: UserRole;
@@ -45,7 +43,6 @@ interface AuthState {
 // Default admin user for initial setup
 const DEFAULT_ADMIN_USER: User = {
   id: 'admin-default',
-  email: 'admin@soltanicenter.com',
   username: 'admin',
   name: 'مدیر سیستم',
   role: 'admin',
@@ -75,13 +72,6 @@ export const useAuthStore = create<AuthState>()(
           
           // بررسی اتصال اینترنت
           if (!navigator.onLine) {
-            set({ connectionStatus: 'disconnected' });
-            return false;
-          }
-
-          // بررسی وجود احراز هویت Google
-          if (!googleAuthService.isAuthenticated()) {
-            console.log('Google authentication not available, setting disconnected status');
             set({ connectionStatus: 'disconnected' });
             return false;
           }
@@ -145,13 +135,12 @@ export const useAuthStore = create<AuthState>()(
             const cachedUsers = offlineSyncService.getCachedData('users');
             if (cachedUsers) {
               const user = cachedUsers.find((u: any) => 
-                (u.username === username || u.email === username) && u.active === true
+                u.username === username && u.active === 'true'
               );
               
               if (user && user.password && await bcrypt.compare(password, user.password)) {
                 const userForAuth: User = {
                   id: user.id,
-                  email: user.email || '',
                   username: user.username,
                   name: user.name,
                   role: user.role || 'technician',
@@ -177,13 +166,13 @@ export const useAuthStore = create<AuthState>()(
           try {
             const users = await googleSheetsService.getUsers();
             const userData = users.find((u: any) => 
-              (u.username === username || u.email === username) && u.active === true
+              u.username === username && u.active === 'true'
             );
 
             if (!userData) {
               return { 
                 success: false, 
-                message: 'نام کاربری یا ایمیل یافت نشد' 
+                message: 'نام کاربری یافت نشد' 
               };
             }
 
@@ -209,7 +198,6 @@ export const useAuthStore = create<AuthState>()(
             // ایجاد شیء کاربر
             const user: User = {
               id: userData.id,
-              email: userData.email || '',
               username: userData.username,
               name: userData.name,
               role: userData.role as UserRole || 'technician',
@@ -234,7 +222,7 @@ export const useAuthStore = create<AuthState>()(
             console.error('Google Sheets error:', error);
             return { 
               success: false, 
-              message: 'خطا در برقراری ارتباط با Google Sheets: ' + (error as Error).message 
+              message: 'خطا در برقراری ارتباط با Google Sheets. لطفاً API Key را بررسی کنید.' 
             };
           }
 

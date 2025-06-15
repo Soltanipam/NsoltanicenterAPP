@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { googleSheetsService } from '../services/googleSheets';
+import { offlineSyncService } from '../services/offlineSync';
 
 export interface Customer {
   id: string;
@@ -61,10 +62,38 @@ export const useCustomerStore = create<CustomerStore>()(
             updatedAt: customer.updated_at || new Date().toLocaleDateString('fa-IR')
           }));
 
+          // Cache the customers for offline use
+          offlineSyncService.cacheData('customers', customersData);
+
           set({ customers, isLoading: false });
           console.log('Customers loaded successfully from Google Sheets:', customers.length);
         } catch (error: any) {
           console.error('Error loading customers from Google Sheets:', error);
+          
+          // Try to load from cache as fallback
+          const cachedCustomers = offlineSyncService.getCachedData('customers');
+          if (cachedCustomers && Array.isArray(cachedCustomers)) {
+            const customers: Customer[] = cachedCustomers.map(customer => ({
+              id: customer.id,
+              customerId: customer.code,
+              firstName: customer.name.split(' ')[0] || '',
+              lastName: customer.name.split(' ').slice(1).join(' ') || '',
+              phone: customer.phone,
+              email: customer.email || '',
+              canLogin: customer.online_access === 'true',
+              createdAt: customer.created_at || new Date().toLocaleDateString('fa-IR'),
+              updatedAt: customer.updated_at || new Date().toLocaleDateString('fa-IR')
+            }));
+            
+            set({ 
+              customers, 
+              isLoading: false, 
+              error: 'اتصال به Google Sheets برقرار نیست. داده‌های کش شده نمایش داده می‌شود.'
+            });
+            console.log('Customers loaded from cache after error:', customers.length);
+            return;
+          }
+          
           set({ 
             isLoading: false, 
             error: 'خطا در بارگذاری مشتریان از Google Sheets: ' + error.message 

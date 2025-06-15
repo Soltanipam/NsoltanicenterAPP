@@ -1,5 +1,4 @@
 import { GOOGLE_CONFIG } from '../config/googleConfig';
-import { googleAuthService } from './googleAuth';
 
 export interface SheetRow {
   [key: string]: string | number | boolean | null;
@@ -9,26 +8,26 @@ class GoogleSheetsService {
   private baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
   private spreadsheetId = GOOGLE_CONFIG.SPREADSHEET_ID;
 
-  private async getValidAccessToken(): Promise<string> {
-    return await googleAuthService.ensureValidToken();
-  }
-
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
     // در حالت آفلاین، خطا بدهیم
     if (!navigator.onLine) {
       throw new Error('کاربر آفلاین است');
     }
 
-    // Get valid OAuth2 access token
-    const accessToken = await this.getValidAccessToken();
+    // بررسی وجود API key
+    const apiKey = GOOGLE_CONFIG.API_KEY;
+    
+    if (!apiKey || apiKey.trim() === '' || apiKey === 'your_google_api_key_here') {
+      throw new Error('Google API key تنظیم نشده است. لطفاً VITE_GOOGLE_API_KEY را در فایل .env تنظیم کنید.');
+    }
     
     const url = `${this.baseUrl}/${this.spreadsheetId}${endpoint}`;
+    const finalUrl = url + (url.includes('?') ? '&' : '?') + `key=${apiKey}`;
     
-    const response = await fetch(url, {
+    const response = await fetch(finalUrl, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
         ...options.headers,
       },
     });
@@ -36,36 +35,13 @@ class GoogleSheetsService {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unknown error' }));
       
-      // بررسی خطاهای مربوط به authentication
-      if (response.status === 401) {
-        // Try to refresh token once
-        try {
-          await googleAuthService.refreshToken();
-          const newAccessToken = await googleAuthService.ensureValidToken();
-          if (newAccessToken) {
-            // Retry the request with new token
-            const retryResponse = await fetch(url, {
-              ...options,
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${newAccessToken}`,
-                ...options.headers,
-              },
-            });
-            
-            if (retryResponse.ok) {
-              return retryResponse.json();
-            }
-          }
-        } catch (refreshError) {
-          // Refresh failed, user needs to re-authenticate
-        }
-        
-        throw new Error('Authentication failed. Please re-authenticate with Google.');
+      // بررسی خطاهای مربوط به API key
+      if (response.status === 400 && error.error?.message?.includes('API key not valid')) {
+        throw new Error('API key معتبر نیست. لطفاً Google API key خود را در فایل .env بررسی کنید و مطمئن شوید که Google Sheets API فعال است.');
       }
       
       if (response.status === 403) {
-        throw new Error('Access denied. Please check your Google account permissions for Google Sheets.');
+        throw new Error('دسترسی رد شد. لطفاً مجوزهای Google API key خود را بررسی کنید.');
       }
       
       throw new Error(error.error?.message || `HTTP ${response.status}: ${response.statusText}`);

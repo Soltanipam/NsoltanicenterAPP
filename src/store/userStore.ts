@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { googleSheetsService } from '../services/googleSheets';
-import { googleAuthService } from '../services/googleAuth';
 import { offlineSyncService } from '../services/offlineSync';
 import bcrypt from 'bcryptjs';
 
@@ -63,38 +62,6 @@ export const useUserStore = create<UserStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          // Check if Google is authenticated
-          if (!googleAuthService.isAuthenticated()) {
-            console.log('Google not authenticated, loading users from cache...');
-            
-            // Try to load from cache first
-            const cachedUsers = offlineSyncService.getCachedData('users');
-            if (cachedUsers && Array.isArray(cachedUsers)) {
-              const users: User[] = cachedUsers.map(user => ({
-                id: user.id,
-                username: user.username,
-                name: user.name,
-                role: user.role,
-                jobDescription: user.job_description,
-                active: user.active === 'true' || user.active === true,
-                permissions: typeof user.permissions === 'string' ? JSON.parse(user.permissions || '{}') : (user.permissions || defaultPermissions),
-                password: user.password,
-                auth_user_id: user.auth_user_id
-              }));
-              
-              set({ users, isLoading: false });
-              console.log('Users loaded from cache:', users.length);
-              return;
-            }
-            
-            // No cached data and no Google auth - show appropriate message
-            set({ 
-              isLoading: false, 
-              error: 'برای مشاهده کاربران، ابتدا با Google احراز هویت کنید یا در حالت آفلاین کار کنید.'
-            });
-            return;
-          }
-
           console.log('Loading users from Google Sheets...');
           const usersData = await googleSheetsService.getUsers();
           
@@ -116,7 +83,7 @@ export const useUserStore = create<UserStore>()(
           set({ users, isLoading: false });
           console.log('Users loaded successfully from Google Sheets:', users.length);
         } catch (error: any) {
-          console.error('Error loading users:', error);
+          console.error('Error loading users from Google Sheets:', error);
           
           // Try to load from cache as fallback
           const cachedUsers = offlineSyncService.getCachedData('users');
@@ -142,18 +109,10 @@ export const useUserStore = create<UserStore>()(
             return;
           }
           
-          // If it's an authentication error, provide more specific guidance
-          if (error.message.includes('access token') || error.message.includes('authenticate')) {
-            set({ 
-              isLoading: false, 
-              error: 'برای دسترسی به Google Sheets، احراز هویت Google ضروری است. لطفاً در صفحه ورود، دکمه "ورود با Google" را کلیک کنید.'
-            });
-          } else {
-            set({ 
-              isLoading: false, 
-              error: 'خطا در بارگذاری کاربران: ' + error.message 
-            });
-          }
+          set({ 
+            isLoading: false, 
+            error: 'خطا در بارگذاری کاربران از Google Sheets: ' + error.message 
+          });
         }
       },
       
@@ -161,11 +120,6 @@ export const useUserStore = create<UserStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          // Check if Google is authenticated
-          if (!googleAuthService.isAuthenticated()) {
-            throw new Error('برای افزودن کاربر، احراز هویت Google ضروری است.');
-          }
-
           console.log('Adding user to Google Sheets:', user);
           
           // Hash password
@@ -206,7 +160,7 @@ export const useUserStore = create<UserStore>()(
           console.error('Error adding user to Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در افزودن کاربر: ' + error.message 
+            error: 'خطا در افزودن کاربر به Google Sheets: ' + error.message 
           });
           throw error;
         }
@@ -216,11 +170,6 @@ export const useUserStore = create<UserStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          // Check if Google is authenticated
-          if (!googleAuthService.isAuthenticated()) {
-            throw new Error('برای به‌روزرسانی کاربر، احراز هویت Google ضروری است.');
-          }
-
           console.log('Updating user in Google Sheets:', id, user);
           
           const userData: any = {};
@@ -253,7 +202,7 @@ export const useUserStore = create<UserStore>()(
           console.error('Error updating user in Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در به‌روزرسانی کاربر: ' + error.message 
+            error: 'خطا در به‌روزرسانی کاربر در Google Sheets: ' + error.message 
           });
           throw error;
         }
@@ -261,11 +210,6 @@ export const useUserStore = create<UserStore>()(
 
       updatePassword: async (id, newPassword) => {
         try {
-          // Check if Google is authenticated
-          if (!googleAuthService.isAuthenticated()) {
-            throw new Error('برای تغییر رمز عبور، احراز هویت Google ضروری است.');
-          }
-
           console.log('Updating user password in Google Sheets:', id);
           
           // Hash new password
@@ -279,7 +223,7 @@ export const useUserStore = create<UserStore>()(
           console.log('User password updated successfully in Google Sheets');
         } catch (error: any) {
           console.error('Error updating user password in Google Sheets:', error);
-          throw new Error('خطا در تغییر رمز عبور: ' + error.message);
+          throw new Error('خطا در تغییر رمز عبور در Google Sheets: ' + error.message);
         }
       },
       
@@ -287,11 +231,6 @@ export const useUserStore = create<UserStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          // Check if Google is authenticated
-          if (!googleAuthService.isAuthenticated()) {
-            throw new Error('برای حذف کاربر، احراز هویت Google ضروری است.');
-          }
-
           console.log('Deleting user from Google Sheets:', id);
           
           await googleSheetsService.deleteUser(id);
@@ -306,7 +245,7 @@ export const useUserStore = create<UserStore>()(
           console.error('Error deleting user from Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در حذف کاربر: ' + error.message 
+            error: 'خطا در حذف کاربر از Google Sheets: ' + error.message 
           });
           throw error;
         }
