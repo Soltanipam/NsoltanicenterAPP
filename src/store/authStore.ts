@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
-import { googleSheetsService } from '../lib/googleSheets';
+import { googleSheetsService } from '../services/googleSheets';
 import bcrypt from 'bcryptjs';
 
 export type UserRole = 'admin' | 'receptionist' | 'technician' | 'warehouse' | 'detailing' | 'accountant';
