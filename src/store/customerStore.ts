@@ -5,13 +5,14 @@ import { offlineSyncService } from '../services/offlineSync';
 
 export interface Customer {
   id: string;
-  customer_code: string;
-  name: string;
-  mobile: string;
+  customerId: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
   email?: string;
-  can_login: boolean;
-  created_at: string;
-  updated_at: string;
+  canLogin: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Generate a unique customer code
@@ -25,13 +26,13 @@ interface CustomerStore {
   error: string | null;
   loadCustomers: () => Promise<void>;
   setCustomers: (customers: Customer[]) => void;
-  addCustomer: (customer: Omit<Customer, 'id' | 'customer_code' | 'created_at' | 'updated_at'>) => Promise<Customer>;
+  addCustomer: (customer: Omit<Customer, 'id' | 'customerId' | 'createdAt' | 'updatedAt'>) => Promise<Customer>;
   addCustomerFromDB: (customer: Customer) => void;
   updateCustomer: (id: string, customer: Partial<Customer>) => Promise<void>;
   updateCustomerFromDB: (customer: Customer) => void;
   deleteCustomer: (id: string) => Promise<void>;
   deleteCustomerFromDB: (id: string) => void;
-  getCustomerByMobile: (mobile: string) => Customer | undefined;
+  getCustomerByPhone: (phone: string) => Customer | undefined;
   clearError: () => void;
 }
 
@@ -51,13 +52,14 @@ export const useCustomerStore = create<CustomerStore>()(
           
           const customers: Customer[] = customersData.map(customer => ({
             id: customer.id,
-            customer_code: customer.customer_code,
-            name: customer.name,
-            mobile: customer.mobile,
+            customerId: customer.code,
+            firstName: customer.name.split(' ')[0] || '',
+            lastName: customer.name.split(' ').slice(1).join(' ') || '',
+            phone: customer.phone,
             email: customer.email || '',
-            can_login: customer.can_login === 'true',
-            created_at: customer.created_at || new Date().toLocaleDateString('fa-IR'),
-            updated_at: customer.updated_at || new Date().toLocaleDateString('fa-IR')
+            canLogin: customer.can_login === 'true',
+            createdAt: customer.created_at || new Date().toLocaleDateString('fa-IR'),
+            updatedAt: customer.updated_at || new Date().toLocaleDateString('fa-IR')
           }));
 
           // Cache the customers for offline use
@@ -73,13 +75,14 @@ export const useCustomerStore = create<CustomerStore>()(
           if (cachedCustomers && Array.isArray(cachedCustomers)) {
             const customers: Customer[] = cachedCustomers.map(customer => ({
               id: customer.id,
-              customer_code: customer.customer_code,
-              name: customer.name,
-              mobile: customer.mobile,
+              customerId: customer.code,
+              firstName: customer.name.split(' ')[0] || '',
+              lastName: customer.name.split(' ').slice(1).join(' ') || '',
+              phone: customer.phone,
               email: customer.email || '',
-              can_login: customer.can_login === 'true',
-              created_at: customer.created_at || new Date().toLocaleDateString('fa-IR'),
-              updated_at: customer.updated_at || new Date().toLocaleDateString('fa-IR')
+              canLogin: customer.can_login === 'true',
+              createdAt: customer.created_at || new Date().toLocaleDateString('fa-IR'),
+              updatedAt: customer.updated_at || new Date().toLocaleDateString('fa-IR')
             }));
             
             set({ 
@@ -110,11 +113,11 @@ export const useCustomerStore = create<CustomerStore>()(
           const customerCode = generateCustomerCode();
           
           const newCustomerData = {
-            customer_code: customerCode,
-            name: customer.name,
-            mobile: customer.mobile,
+            code: customerCode,
+            name: `${customer.firstName} ${customer.lastName}`,
+            phone: customer.phone,
             email: customer.email || '',
-            can_login: customer.can_login ? 'true' : 'false',
+            can_login: customer.canLogin ? 'true' : 'false',
             created_at: new Date().toLocaleDateString('fa-IR'),
             updated_at: new Date().toLocaleDateString('fa-IR')
           };
@@ -123,13 +126,14 @@ export const useCustomerStore = create<CustomerStore>()(
 
           const customerForStore: Customer = {
             id: newCustomer.id,
-            customer_code: newCustomer.customer_code,
-            name: newCustomer.name,
-            mobile: newCustomer.mobile,
+            customerId: newCustomer.code,
+            firstName: customer.firstName,
+            lastName: customer.lastName,
+            phone: newCustomer.phone,
             email: newCustomer.email,
-            can_login: newCustomer.can_login === 'true',
-            created_at: newCustomer.created_at,
-            updated_at: newCustomer.updated_at
+            canLogin: newCustomer.can_login === 'true',
+            createdAt: newCustomer.created_at,
+            updatedAt: newCustomer.updated_at
           };
 
           set(state => ({
@@ -163,23 +167,29 @@ export const useCustomerStore = create<CustomerStore>()(
           console.log('Updating customer in Google Sheets:', id, updates);
           
           const updateData: any = {};
-          if (updates.name !== undefined) updateData.name = updates.name;
-          if (updates.mobile !== undefined) updateData.mobile = updates.mobile;
+          if (updates.firstName !== undefined || updates.lastName !== undefined) {
+            const currentCustomer = get().customers.find(c => c.id === id);
+            const firstName = updates.firstName !== undefined ? updates.firstName : currentCustomer?.firstName || '';
+            const lastName = updates.lastName !== undefined ? updates.lastName : currentCustomer?.lastName || '';
+            updateData.name = `${firstName} ${lastName}`;
+          }
+          if (updates.phone !== undefined) updateData.phone = updates.phone;
           if (updates.email !== undefined) updateData.email = updates.email;
-          if (updates.can_login !== undefined) updateData.can_login = updates.can_login ? 'true' : 'false';
+          if (updates.canLogin !== undefined) updateData.can_login = updates.canLogin ? 'true' : 'false';
           updateData.updated_at = new Date().toLocaleDateString('fa-IR');
 
           const updatedCustomer = await googleSheetsService.updateCustomer(id, updateData);
 
           const customerForStore: Customer = {
             id: updatedCustomer.id,
-            customer_code: updatedCustomer.customer_code,
-            name: updatedCustomer.name,
-            mobile: updatedCustomer.mobile,
+            customerId: updatedCustomer.code,
+            firstName: updatedCustomer.name.split(' ')[0] || '',
+            lastName: updatedCustomer.name.split(' ').slice(1).join(' ') || '',
+            phone: updatedCustomer.phone,
             email: updatedCustomer.email,
-            can_login: updatedCustomer.can_login === 'true',
-            created_at: updatedCustomer.created_at,
-            updated_at: updatedCustomer.updated_at
+            canLogin: updatedCustomer.can_login === 'true',
+            createdAt: updatedCustomer.created_at,
+            updatedAt: updatedCustomer.updated_at
           };
 
           set(state => ({
@@ -236,8 +246,8 @@ export const useCustomerStore = create<CustomerStore>()(
         }));
       },
 
-      getCustomerByMobile: (mobile: string) => {
-        return get().customers.find(customer => customer.mobile === mobile);
+      getCustomerByPhone: (phone: string) => {
+        return get().customers.find(customer => customer.phone === phone);
       },
 
       clearError: () => set({ error: null })

@@ -5,12 +5,13 @@ import { googleSheetsService } from '../services/googleSheets';
 
 export interface Customer {
   id: string;
-  customer_code: string;
-  name: string;
-  mobile: string;
+  customerId: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
   email?: string;
-  can_login: boolean;
-  created_at: string;
+  canLogin: boolean;
+  createdAt: string;
 }
 
 interface CustomerAuthState {
@@ -40,7 +41,7 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
           // Query customers from Google Sheets
           const customers = await googleSheetsService.getCustomers();
           const customerData = customers.find(c => 
-            c.customer_code === customerCode && c.mobile === mobile
+            c.code === customerCode && c.phone === mobile
           );
 
           if (!customerData) {
@@ -59,15 +60,16 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
           // Create customer object for state
           const customer: Customer = {
             id: customerData.id,
-            customer_code: customerData.customer_code,
-            name: customerData.name,
-            mobile: customerData.mobile,
+            customerId: customerData.code,
+            firstName: customerData.name.split(' ')[0] || '',
+            lastName: customerData.name.split(' ').slice(1).join(' ') || '',
+            phone: customerData.phone,
             email: customerData.email,
-            can_login: customerData.can_login === 'true',
-            created_at: customerData.created_at
+            canLogin: customerData.can_login === 'true',
+            createdAt: customerData.created_at
           };
 
-          console.log('Customer login successful:', customer.customer_code);
+          console.log('Customer login successful:', customer.customerId);
           set({ 
             customer, 
             isAuthenticated: true, 

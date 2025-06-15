@@ -1,0 +1,12 @@
+{
+  "spreadsheetId": "16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w",
+  "sheets": {
+    "users": "users",
+    "customers": "customers", 
+    "receptions": "receptions",
+    "tasks": "tasks",
+    "messages": "messages",
+    "sms_settings": "sms_settings",
+    "sms_logs": "sms_logs"
+  }
+}

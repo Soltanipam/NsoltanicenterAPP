@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { googleSheetsService } from '../services/googleSheets';
+import { offlineSyncService } from '../services/offlineSync';
 
 export interface SMSTemplate {
   id: string;
@@ -12,26 +13,25 @@ export interface SMSTemplate {
 export interface SMSSettings {
   id?: string;
   username: string;
-  password_hash: string;
-  from_number: string;
+  password: string;
+  fromNumber: string;
   enabled: boolean;
-  templates: string;
+  templates: SMSTemplate[];
 }
 
 export interface SMSLog {
   id: string;
-  to_number: string;
+  toNumber: string;
   message: string;
   status: 'sent' | 'failed' | 'pending';
-  template_used?: string;
+  templateUsed?: string;
   cost?: number;
-  sent_at: string;
+  sentAt: string;
 }
 
 interface SMSStore {
-  settings: SMSSettings | null;
+  settings: SMSSettings;
   logs: SMSLog[];
-  templates: SMSTemplate[];
   isLoading: boolean;
   error: string | null;
   loadSettings: () => Promise<void>;
@@ -67,12 +67,19 @@ const defaultTemplates: SMSTemplate[] = [
   }
 ];
 
+const defaultSettings: SMSSettings = {
+  username: '',
+  password: '',
+  fromNumber: '',
+  enabled: false,
+  templates: defaultTemplates
+};
+
 export const useSMSStore = create<SMSStore>()(
   persist(
     (set, get) => ({
-      settings: null,
+      settings: defaultSettings,
       logs: [],
-      templates: defaultTemplates,
       isLoading: false,
       error: null,
 
@@ -80,33 +87,58 @@ export const useSMSStore = create<SMSStore>()(
         set({ isLoading: true, error: null });
 
         try {
+          console.log('Loading SMS settings from Google Sheets...');
           const settingsData = await googleSheetsService.getSMSSettings();
+          
           if (settingsData.length > 0) {
             const settings = settingsData[0];
             const parsedSettings: SMSSettings = {
               id: settings.id,
               username: settings.username || '',
-              password_hash: settings.password_hash || '',
-              from_number: settings.from_number || '',
+              password: settings.password_hash || '',
+              fromNumber: settings.from_number || '',
               enabled: settings.enabled === 'true',
-              templates: settings.templates || JSON.stringify(defaultTemplates)
+              templates: settings.templates ? JSON.parse(settings.templates) : defaultTemplates
             };
 
-            // Parse templates
-            try {
-              const templates = JSON.parse(parsedSettings.templates);
-              set({ settings: parsedSettings, templates, isLoading: false });
-            } catch {
-              set({ settings: parsedSettings, templates: defaultTemplates, isLoading: false });
-            }
+            // Cache the settings for offline use
+            offlineSyncService.cacheData('sms_settings', settingsData);
+
+            set({ settings: parsedSettings, isLoading: false });
+            console.log('SMS settings loaded successfully from Google Sheets');
           } else {
-            set({ isLoading: false });
+            set({ settings: defaultSettings, isLoading: false });
+            console.log('No SMS settings found, using defaults');
           }
         } catch (error: any) {
-          console.error('Error loading SMS settings:', error);
+          console.error('Error loading SMS settings from Google Sheets:', error);
+          
+          // Try to load from cache as fallback
+          const cachedSettings = offlineSyncService.getCachedData('sms_settings');
+          if (cachedSettings && Array.isArray(cachedSettings) && cachedSettings.length > 0) {
+            const settings = cachedSettings[0];
+            const parsedSettings: SMSSettings = {
+              id: settings.id,
+              username: settings.username || '',
+              password: settings.password_hash || '',
+              fromNumber: settings.from_number || '',
+              enabled: settings.enabled === 'true',
+              templates: settings.templates ? JSON.parse(settings.templates) : defaultTemplates
+            };
+            
+            set({ 
+              settings: parsedSettings, 
+              isLoading: false, 
+              error: 'اتصال به Google Sheets برقرار نیست. داده‌های کش شده نمایش داده می‌شود.'
+            });
+            console.log('SMS settings loaded from cache after error');
+            return;
+          }
+          
           set({ 
+            settings: defaultSettings,
             isLoading: false, 
-            error: 'خطا در بارگذاری تنظیمات پیامک' 
+            error: 'خطا در بارگذاری تنظیمات پیامک از Google Sheets: ' + error.message 
           });
         }
       },
@@ -115,23 +147,52 @@ export const useSMSStore = create<SMSStore>()(
         set({ isLoading: true, error: null });
 
         try {
+          console.log('Loading SMS logs from Google Sheets...');
           const logsData = await googleSheetsService.getSMSLogs();
+          
           const logs: SMSLog[] = logsData.map(log => ({
             id: log.id,
-            to_number: log.to_number,
+            toNumber: log.to_number,
             message: log.message,
             status: log.status as 'sent' | 'failed' | 'pending',
-            template_used: log.template_used,
+            templateUsed: log.template_used,
             cost: log.cost ? parseInt(log.cost) : 0,
-            sent_at: log.sent_at
+            sentAt: log.sent_at
           }));
 
+          // Cache the logs for offline use
+          offlineSyncService.cacheData('sms_logs', logsData);
+
           set({ logs, isLoading: false });
+          console.log('SMS logs loaded successfully from Google Sheets:', logs.length);
         } catch (error: any) {
-          console.error('Error loading SMS logs:', error);
+          console.error('Error loading SMS logs from Google Sheets:', error);
+          
+          // Try to load from cache as fallback
+          const cachedLogs = offlineSyncService.getCachedData('sms_logs');
+          if (cachedLogs && Array.isArray(cachedLogs)) {
+            const logs: SMSLog[] = cachedLogs.map(log => ({
+              id: log.id,
+              toNumber: log.to_number,
+              message: log.message,
+              status: log.status as 'sent' | 'failed' | 'pending',
+              templateUsed: log.template_used,
+              cost: log.cost ? parseInt(log.cost) : 0,
+              sentAt: log.sent_at
+            }));
+            
+            set({ 
+              logs, 
+              isLoading: false, 
+              error: 'اتصال به Google Sheets برقرار نیست. داده‌های کش شده نمایش داده می‌شود.'
+            });
+            console.log('SMS logs loaded from cache after error:', logs.length);
+            return;
+          }
+          
           set({ 
             isLoading: false, 
-            error: 'خطا در بارگذاری لاگ پیامک‌ها' 
+            error: 'خطا در بارگذاری لاگ پیامک‌ها از Google Sheets: ' + error.message 
           });
         }
       },
@@ -140,34 +201,32 @@ export const useSMSStore = create<SMSStore>()(
         set({ isLoading: true, error: null });
 
         try {
+          console.log('Updating SMS settings in Google Sheets:', newSettings);
           const currentSettings = get().settings;
           const updatedSettings = { ...currentSettings, ...newSettings };
 
-          if (currentSettings?.id) {
-            await googleSheetsService.updateSMSSettings(currentSettings.id, {
-              username: updatedSettings.username,
-              password_hash: updatedSettings.password_hash,
-              from_number: updatedSettings.from_number,
-              enabled: updatedSettings.enabled ? 'true' : 'false',
-              templates: updatedSettings.templates
-            });
+          const settingsData = {
+            username: updatedSettings.username,
+            password_hash: updatedSettings.password,
+            from_number: updatedSettings.fromNumber,
+            enabled: updatedSettings.enabled ? 'true' : 'false',
+            templates: JSON.stringify(updatedSettings.templates)
+          };
+
+          if (currentSettings.id) {
+            await googleSheetsService.updateSMSSettings(currentSettings.id, settingsData);
           } else {
-            const newSettingsData = await googleSheetsService.addSMSSettings({
-              username: updatedSettings.username,
-              password_hash: updatedSettings.password_hash,
-              from_number: updatedSettings.from_number,
-              enabled: updatedSettings.enabled ? 'true' : 'false',
-              templates: updatedSettings.templates
-            });
+            const newSettingsData = await googleSheetsService.addSMSSettings(settingsData);
             updatedSettings.id = newSettingsData.id;
           }
 
           set({ settings: updatedSettings, isLoading: false });
+          console.log('SMS settings updated successfully in Google Sheets');
         } catch (error: any) {
-          console.error('Error updating SMS settings:', error);
+          console.error('Error updating SMS settings in Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در به‌روزرسانی تنظیمات پیامک' 
+            error: 'خطا در به‌روزرسانی تنظیمات پیامک در Google Sheets: ' + error.message 
           });
           throw error;
         }
@@ -175,62 +234,41 @@ export const useSMSStore = create<SMSStore>()(
 
       addTemplate: (template) => set((state) => {
         const newTemplate = { ...template, id: Date.now().toString() };
-        const updatedTemplates = [...state.templates, newTemplate];
+        const updatedTemplates = [...state.settings.templates, newTemplate];
+        const updatedSettings = { ...state.settings, templates: updatedTemplates };
         
-        // Update settings with new templates
-        if (state.settings) {
-          const updatedSettings = {
-            ...state.settings,
-            templates: JSON.stringify(updatedTemplates)
-          };
-          
-          // Save to Google Sheets
-          get().updateSettings(updatedSettings);
-        }
+        // Save to Google Sheets
+        get().updateSettings({ templates: updatedTemplates });
         
-        return { templates: updatedTemplates };
+        return { settings: updatedSettings };
       }),
 
       updateTemplate: (id, template) => set((state) => {
-        const updatedTemplates = state.templates.map(t =>
+        const updatedTemplates = state.settings.templates.map(t =>
           t.id === id ? { ...t, ...template } : t
         );
+        const updatedSettings = { ...state.settings, templates: updatedTemplates };
         
-        // Update settings with modified templates
-        if (state.settings) {
-          const updatedSettings = {
-            ...state.settings,
-            templates: JSON.stringify(updatedTemplates)
-          };
-          
-          // Save to Google Sheets
-          get().updateSettings(updatedSettings);
-        }
+        // Save to Google Sheets
+        get().updateSettings({ templates: updatedTemplates });
         
-        return { templates: updatedTemplates };
+        return { settings: updatedSettings };
       }),
 
       deleteTemplate: (id) => set((state) => {
-        const updatedTemplates = state.templates.filter(t => t.id !== id);
+        const updatedTemplates = state.settings.templates.filter(t => t.id !== id);
+        const updatedSettings = { ...state.settings, templates: updatedTemplates };
         
-        // Update settings with remaining templates
-        if (state.settings) {
-          const updatedSettings = {
-            ...state.settings,
-            templates: JSON.stringify(updatedTemplates)
-          };
-          
-          // Save to Google Sheets
-          get().updateSettings(updatedSettings);
-        }
+        // Save to Google Sheets
+        get().updateSettings({ templates: updatedTemplates });
         
-        return { templates: updatedTemplates };
+        return { settings: updatedSettings };
       }),
 
       sendSMS: async (to, message, templateId) => {
         const { settings } = get();
         
-        if (!settings?.enabled || !settings.username || !settings.password_hash) {
+        if (!settings.enabled || !settings.username || !settings.password) {
           console.error('SMS service not configured');
           return false;
         }
@@ -245,9 +283,9 @@ export const useSMSStore = create<SMSStore>()(
             },
             body: JSON.stringify({
               username: settings.username,
-              password: settings.password_hash,
+              password: settings.password,
               to: to,
-              from: settings.from_number,
+              from: settings.fromNumber,
               text: message,
               isflash: false
             })
@@ -258,11 +296,11 @@ export const useSMSStore = create<SMSStore>()(
 
           // Add to logs
           await get().addLog({
-            to_number: to,
+            toNumber: to,
             message,
             status: success ? 'sent' : 'failed',
-            sent_at: new Date().toLocaleDateString('fa-IR'),
-            template_used: templateId,
+            sentAt: new Date().toLocaleDateString('fa-IR'),
+            templateUsed: templateId,
             cost: success ? 50 : 0 // Estimated cost in Toman
           });
 
@@ -272,11 +310,11 @@ export const useSMSStore = create<SMSStore>()(
           
           // Add failed log
           await get().addLog({
-            to_number: to,
+            toNumber: to,
             message,
             status: 'failed',
-            sent_at: new Date().toLocaleDateString('fa-IR'),
-            template_used: templateId
+            sentAt: new Date().toLocaleDateString('fa-IR'),
+            templateUsed: templateId
           });
 
           return false;
@@ -285,37 +323,41 @@ export const useSMSStore = create<SMSStore>()(
 
       addLog: async (log) => {
         try {
+          console.log('Adding SMS log to Google Sheets:', log);
+
           const newLog = await googleSheetsService.addSMSLog({
-            to_number: log.to_number,
+            to_number: log.toNumber,
             message: log.message,
             status: log.status,
-            template_used: log.template_used || '',
+            template_used: log.templateUsed || '',
             cost: log.cost || 0,
-            sent_at: log.sent_at
+            sent_at: log.sentAt
           });
 
           const logForStore: SMSLog = {
             id: newLog.id,
-            to_number: newLog.to_number,
+            toNumber: newLog.to_number,
             message: newLog.message,
             status: newLog.status as 'sent' | 'failed' | 'pending',
-            template_used: newLog.template_used,
+            templateUsed: newLog.template_used,
             cost: newLog.cost ? parseInt(newLog.cost) : 0,
-            sent_at: newLog.sent_at
+            sentAt: newLog.sent_at
           };
 
           set(state => ({
             logs: [logForStore, ...state.logs]
           }));
-        } catch (error) {
-          console.error('Error adding SMS log:', error);
+
+          console.log('SMS log added successfully to Google Sheets');
+        } catch (error: any) {
+          console.error('Error adding SMS log to Google Sheets:', error);
         }
       },
 
       getBalance: async () => {
         const { settings } = get();
         
-        if (!settings?.enabled || !settings.username || !settings.password_hash) {
+        if (!settings.enabled || !settings.username || !settings.password) {
           return 0;
         }
 
@@ -328,7 +370,7 @@ export const useSMSStore = create<SMSStore>()(
             },
             body: JSON.stringify({
               username: settings.username,
-              password: settings.password_hash
+              password: settings.password
             })
           });
 

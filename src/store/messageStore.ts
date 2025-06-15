@@ -1,15 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { googleSheetsService } from '../services/googleSheets';
+import { offlineSyncService } from '../services/offlineSync';
 
 export interface Message {
   id: string;
-  from_user_id: string;
-  to_user_id: string;
+  from: string;
+  to: string;
   subject: string;
   content: string;
   read: boolean;
-  created_at: string;
+  createdAt: string;
 }
 
 interface MessageStore {
@@ -18,7 +19,7 @@ interface MessageStore {
   error: string | null;
   setMessages: (messages: Message[]) => void;
   loadMessages: () => Promise<void>;
-  addMessage: (message: Omit<Message, 'id' | 'created_at' | 'read'>) => Promise<void>;
+  addMessage: (message: Omit<Message, 'id' | 'createdAt' | 'read'>) => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
   getUnreadCount: (userId: string) => number;
@@ -39,23 +40,52 @@ export const useMessageStore = create<MessageStore>()(
         set({ isLoading: true, error: null });
 
         try {
+          console.log('Loading messages from Google Sheets...');
           const messagesData = await googleSheetsService.getMessages();
+          
           const messages: Message[] = messagesData.map(msg => ({
             id: msg.id,
-            from_user_id: msg.from_user_id,
-            to_user_id: msg.to_user_id,
+            from: msg.from_user_id,
+            to: msg.to_user_id,
             subject: msg.subject,
             content: msg.content,
             read: msg.read === 'true',
-            created_at: msg.created_at
+            createdAt: msg.created_at
           }));
 
+          // Cache the messages for offline use
+          offlineSyncService.cacheData('messages', messagesData);
+
           set({ messages, isLoading: false });
+          console.log('Messages loaded successfully from Google Sheets:', messages.length);
         } catch (error: any) {
-          console.error('Error loading messages:', error);
+          console.error('Error loading messages from Google Sheets:', error);
+          
+          // Try to load from cache as fallback
+          const cachedMessages = offlineSyncService.getCachedData('messages');
+          if (cachedMessages && Array.isArray(cachedMessages)) {
+            const messages: Message[] = cachedMessages.map(msg => ({
+              id: msg.id,
+              from: msg.from_user_id,
+              to: msg.to_user_id,
+              subject: msg.subject,
+              content: msg.content,
+              read: msg.read === 'true',
+              createdAt: msg.created_at
+            }));
+            
+            set({ 
+              messages, 
+              isLoading: false, 
+              error: 'اتصال به Google Sheets برقرار نیست. داده‌های کش شده نمایش داده می‌شود.'
+            });
+            console.log('Messages loaded from cache after error:', messages.length);
+            return;
+          }
+          
           set({ 
             isLoading: false, 
-            error: 'خطا در بارگذاری پیام‌ها' 
+            error: 'خطا در بارگذاری پیام‌ها از Google Sheets: ' + error.message 
           });
         }
       },
@@ -64,9 +94,11 @@ export const useMessageStore = create<MessageStore>()(
         set({ isLoading: true, error: null });
 
         try {
+          console.log('Adding message to Google Sheets:', message);
+
           const newMessage = await googleSheetsService.addMessage({
-            from_user_id: message.from_user_id,
-            to_user_id: message.to_user_id,
+            from_user_id: message.from,
+            to_user_id: message.to,
             subject: message.subject,
             content: message.content,
             read: 'false',
@@ -75,12 +107,12 @@ export const useMessageStore = create<MessageStore>()(
 
           const messageForStore: Message = {
             id: newMessage.id,
-            from_user_id: newMessage.from_user_id,
-            to_user_id: newMessage.to_user_id,
+            from: newMessage.from_user_id,
+            to: newMessage.to_user_id,
             subject: newMessage.subject,
             content: newMessage.content,
             read: false,
-            created_at: newMessage.created_at
+            createdAt: newMessage.created_at
           };
 
           set(state => ({
@@ -88,11 +120,12 @@ export const useMessageStore = create<MessageStore>()(
             isLoading: false
           }));
 
+          console.log('Message added successfully to Google Sheets');
         } catch (error: any) {
-          console.error('Error sending message:', error);
+          console.error('Error sending message to Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در ارسال پیام' 
+            error: 'خطا در ارسال پیام به Google Sheets: ' + error.message 
           });
           throw error;
         }
@@ -100,6 +133,8 @@ export const useMessageStore = create<MessageStore>()(
 
       markAsRead: async (id) => {
         try {
+          console.log('Marking message as read in Google Sheets:', id);
+
           await googleSheetsService.updateMessage(id, { read: 'true' });
 
           set(state => ({
@@ -108,9 +143,10 @@ export const useMessageStore = create<MessageStore>()(
             )
           }));
 
+          console.log('Message marked as read successfully in Google Sheets');
         } catch (error: any) {
-          console.error('Error marking message as read:', error);
-          set({ error: 'خطا در علامت‌گذاری پیام' });
+          console.error('Error marking message as read in Google Sheets:', error);
+          set({ error: 'خطا در علامت‌گذاری پیام در Google Sheets: ' + error.message });
         }
       },
 
@@ -118,6 +154,8 @@ export const useMessageStore = create<MessageStore>()(
         set({ isLoading: true, error: null });
 
         try {
+          console.log('Deleting message from Google Sheets:', id);
+
           await googleSheetsService.deleteMessage(id);
 
           set(state => ({
@@ -125,11 +163,12 @@ export const useMessageStore = create<MessageStore>()(
             isLoading: false
           }));
 
+          console.log('Message deleted successfully from Google Sheets');
         } catch (error: any) {
-          console.error('Error deleting message:', error);
+          console.error('Error deleting message from Google Sheets:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در حذف پیام' 
+            error: 'خطا در حذف پیام از Google Sheets: ' + error.message 
           });
           throw error;
         }
@@ -137,13 +176,13 @@ export const useMessageStore = create<MessageStore>()(
 
       getUnreadCount: (userId) => {
         return get().messages.filter(msg => 
-          msg.to_user_id === userId && !msg.read
+          msg.to === userId && !msg.read
         ).length;
       },
 
       getUserMessages: (userId) => {
         return get().messages.filter(msg => 
-          msg.to_user_id === userId || msg.from_user_id === userId
+          msg.to === userId || msg.from === userId
         ).sort((a, b) => b.id.localeCompare(a.id));
       },
 

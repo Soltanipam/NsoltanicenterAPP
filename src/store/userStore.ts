@@ -5,14 +5,12 @@ import { offlineSyncService } from '../services/offlineSync';
 import bcrypt from 'bcryptjs';
 
 export interface UserPermissions {
-  can_view_receptions: boolean;
-  can_create_tasks: boolean;
-  can_view_tasks: boolean;
-  can_send_messages: boolean;
-  can_create_reception: boolean;
-  can_complete_services: boolean;
-  can_manage_customers: boolean;
-  can_view_history: boolean;
+  canViewReceptions: boolean;
+  canCreateTask: boolean;
+  canCreateReception: boolean;
+  canCompleteServices: boolean;
+  canManageCustomers: boolean;
+  canViewHistory: boolean;
 }
 
 export interface User {
@@ -20,21 +18,22 @@ export interface User {
   username: string;
   name: string;
   role: string;
-  job_description?: string;
-  is_active: boolean;
+  jobDescription?: string;
+  active: boolean;
   permissions: UserPermissions;
-  password?: string;
+  settings?: {
+    sidebarOpen: boolean;
+  };
+  auth_user_id?: string;
 }
 
 const defaultPermissions: UserPermissions = {
-  can_view_receptions: false,
-  can_create_tasks: false,
-  can_view_tasks: false,
-  can_send_messages: false,
-  can_create_reception: false,
-  can_complete_services: false,
-  can_manage_customers: false,
-  can_view_history: false
+  canViewReceptions: false,
+  canCreateTask: false,
+  canCreateReception: false,
+  canCompleteServices: false,
+  canManageCustomers: false,
+  canViewHistory: false
 };
 
 // Helper function to safely parse permissions
@@ -73,49 +72,41 @@ const getRoleBasedPermissions = (role: string): UserPermissions => {
   switch (role.toLowerCase()) {
     case 'admin':
       return {
-        can_view_receptions: true,
-        can_create_tasks: true,
-        can_view_tasks: true,
-        can_send_messages: true,
-        can_create_reception: true,
-        can_complete_services: true,
-        can_manage_customers: true,
-        can_view_history: true
+        canViewReceptions: true,
+        canCreateTask: true,
+        canCreateReception: true,
+        canCompleteServices: true,
+        canManageCustomers: true,
+        canViewHistory: true
       };
     case 'receptionist':
       return {
-        can_view_receptions: true,
-        can_create_tasks: true,
-        can_view_tasks: true,
-        can_send_messages: true,
-        can_create_reception: true,
-        can_complete_services: false,
-        can_manage_customers: true,
-        can_view_history: true
+        canViewReceptions: true,
+        canCreateTask: true,
+        canCreateReception: true,
+        canCompleteServices: false,
+        canManageCustomers: true,
+        canViewHistory: true
       };
     case 'technician':
       return {
-        can_view_receptions: true,
-        can_create_tasks: false,
-        can_view_tasks: true,
-        can_send_messages: true,
-        can_create_reception: false,
-        can_complete_services: true,
-        can_manage_customers: false,
-        can_view_history: true
+        canViewReceptions: true,
+        canCreateTask: false,
+        canCreateReception: false,
+        canCompleteServices: true,
+        canManageCustomers: false,
+        canViewHistory: true
       };
     case 'warehouse':
     case 'detailing':
     case 'accountant':
       return {
-        can_view_receptions: true,
-        can_create_tasks: false,
-        can_view_tasks: true,
-        can_send_messages: true,
-        can_create_reception: false,
-        can_complete_services: true,
-        can_manage_customers: false,
-        can_view_history: true
+        canViewReceptions: true,
+        canCreateTask: false,
+        canCreateReception: false,
+        canCompleteServices: true,
+        canManageCustomers: false,
+        canViewHistory: true
       };
     default:
       return defaultPermissions;
@@ -158,10 +149,11 @@ export const useUserStore = create<UserStore>()(
             username: user.username,
             name: user.name,
             role: user.role,
-            job_description: user.job_description,
-            is_active: user.is_active === 'true' || user.is_active === true,
+            jobDescription: user.job_description,
+            active: user.active === 'true' || user.active === true,
             permissions: parsePermissions(user.permissions),
-            password: user.password
+            settings: typeof user.settings === 'string' ? JSON.parse(user.settings || '{}') : (user.settings || { sidebarOpen: true }),
+            auth_user_id: user.id // Use the same ID for compatibility
           }));
 
           // Cache the users for offline use
@@ -180,10 +172,11 @@ export const useUserStore = create<UserStore>()(
               username: user.username,
               name: user.name,
               role: user.role,
-              job_description: user.job_description,
-              is_active: user.is_active === 'true' || user.is_active === true,
+              jobDescription: user.job_description,
+              active: user.active === 'true' || user.active === true,
               permissions: parsePermissions(user.permissions),
-              password: user.password
+              settings: typeof user.settings === 'string' ? JSON.parse(user.settings || '{}') : (user.settings || { sidebarOpen: true }),
+              auth_user_id: user.id
             }));
             
             set({ 
@@ -215,9 +208,10 @@ export const useUserStore = create<UserStore>()(
             username: user.username,
             name: user.name,
             role: user.role,
-            job_description: user.job_description || '',
-            is_active: user.is_active ? 'true' : 'false',
+            job_description: user.jobDescription || '',
+            active: user.active ? 'true' : 'false',
             permissions: JSON.stringify(user.permissions || defaultPermissions),
+            settings: JSON.stringify(user.settings || { sidebarOpen: true }),
             password: hashedPassword,
             created_at: new Date().toLocaleDateString('fa-IR'),
             updated_at: new Date().toLocaleDateString('fa-IR')
@@ -230,9 +224,11 @@ export const useUserStore = create<UserStore>()(
             username: newUser.username,
             name: newUser.name,
             role: newUser.role,
-            job_description: newUser.job_description,
-            is_active: newUser.is_active === 'true',
-            permissions: parsePermissions(newUser.permissions)
+            jobDescription: newUser.job_description,
+            active: newUser.active === 'true',
+            permissions: parsePermissions(newUser.permissions),
+            settings: typeof newUser.settings === 'string' ? JSON.parse(newUser.settings || '{}') : (newUser.settings || { sidebarOpen: true }),
+            auth_user_id: newUser.id
           };
           
           set((state) => ({
@@ -261,9 +257,10 @@ export const useUserStore = create<UserStore>()(
           if (user.username !== undefined) userData.username = user.username;
           if (user.name !== undefined) userData.name = user.name;
           if (user.role !== undefined) userData.role = user.role;
-          if (user.job_description !== undefined) userData.job_description = user.job_description;
-          if (user.is_active !== undefined) userData.is_active = user.is_active ? 'true' : 'false';
+          if (user.jobDescription !== undefined) userData.job_description = user.jobDescription;
+          if (user.active !== undefined) userData.active = user.active ? 'true' : 'false';
           if (user.permissions !== undefined) userData.permissions = JSON.stringify(user.permissions);
+          if (user.settings !== undefined) userData.settings = JSON.stringify(user.settings);
           userData.updated_at = new Date().toLocaleDateString('fa-IR');
           
           const updatedUser = await googleSheetsService.updateUser(id, userData);
@@ -274,9 +271,11 @@ export const useUserStore = create<UserStore>()(
               username: updatedUser.username,
               name: updatedUser.name,
               role: updatedUser.role,
-              job_description: updatedUser.job_description,
-              is_active: updatedUser.is_active === 'true',
-              permissions: parsePermissions(updatedUser.permissions)
+              jobDescription: updatedUser.job_description,
+              active: updatedUser.active === 'true',
+              permissions: parsePermissions(updatedUser.permissions),
+              settings: typeof updatedUser.settings === 'string' ? JSON.parse(updatedUser.settings || '{}') : (updatedUser.settings || { sidebarOpen: true }),
+              auth_user_id: updatedUser.id
             } : u),
             isLoading: false
           }));
@@ -337,7 +336,7 @@ export const useUserStore = create<UserStore>()(
       
       getUser: (username, password) => {
         const user = get().users.find(u => 
-          u.username === username && u.is_active
+          u.username === username && u.active
         );
         return user || null;
       },
