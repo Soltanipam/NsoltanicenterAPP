@@ -4,12 +4,12 @@ import { googleSheetsService } from '../services/googleSheets';
 
 export interface Message {
   id: string;
-  from: string;
-  to: string;
+  from_user_id: string;
+  to_user_id: string;
   subject: string;
   content: string;
-  createdAt: string;
   read: boolean;
+  created_at: string;
 }
 
 interface MessageStore {
@@ -18,7 +18,7 @@ interface MessageStore {
   error: string | null;
   setMessages: (messages: Message[]) => void;
   loadMessages: () => Promise<void>;
-  addMessage: (message: Omit<Message, 'id' | 'createdAt' | 'read'>) => Promise<void>;
+  addMessage: (message: Omit<Message, 'id' | 'created_at' | 'read'>) => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
   getUnreadCount: (userId: string) => number;
@@ -42,12 +42,12 @@ export const useMessageStore = create<MessageStore>()(
           const messagesData = await googleSheetsService.getMessages();
           const messages: Message[] = messagesData.map(msg => ({
             id: msg.id,
-            from: msg.from_user_id,
-            to: msg.to_user_id,
+            from_user_id: msg.from_user_id,
+            to_user_id: msg.to_user_id,
             subject: msg.subject,
             content: msg.content,
             read: msg.read === 'true',
-            createdAt: msg.created_at
+            created_at: msg.created_at
           }));
 
           set({ messages, isLoading: false });
@@ -65,8 +65,8 @@ export const useMessageStore = create<MessageStore>()(
 
         try {
           const newMessage = await googleSheetsService.addMessage({
-            from_user_id: message.from,
-            to_user_id: message.to,
+            from_user_id: message.from_user_id,
+            to_user_id: message.to_user_id,
             subject: message.subject,
             content: message.content,
             read: 'false',
@@ -75,12 +75,12 @@ export const useMessageStore = create<MessageStore>()(
 
           const messageForStore: Message = {
             id: newMessage.id,
-            from: newMessage.from_user_id,
-            to: newMessage.to_user_id,
+            from_user_id: newMessage.from_user_id,
+            to_user_id: newMessage.to_user_id,
             subject: newMessage.subject,
             content: newMessage.content,
             read: false,
-            createdAt: newMessage.created_at
+            created_at: newMessage.created_at
           };
 
           set(state => ({
@@ -137,13 +137,13 @@ export const useMessageStore = create<MessageStore>()(
 
       getUnreadCount: (userId) => {
         return get().messages.filter(msg => 
-          msg.to === userId && !msg.read
+          msg.to_user_id === userId && !msg.read
         ).length;
       },
 
       getUserMessages: (userId) => {
         return get().messages.filter(msg => 
-          msg.to === userId || msg.from === userId
+          msg.to_user_id === userId || msg.from_user_id === userId
         ).sort((a, b) => b.id.localeCompare(a.id));
       },
 

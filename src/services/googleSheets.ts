@@ -19,7 +19,7 @@ class GoogleSheetsService {
     
     // برای عملیات نوشتن، OAuth 2.0 الزامی است
     if (isWriteOperation) {
-      const accessToken = await googleAuthService.getAccessToken();
+      const accessToken = await googleAuthService.ensureValidToken();
       if (!accessToken) {
         throw new Error('برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید.');
       }
@@ -39,29 +39,6 @@ class GoogleSheetsService {
         const error = await response.json().catch(() => ({ error: 'Unknown error' }));
         
         if (response.status === 401) {
-          // Token منقضی شده، تلاش برای تجدید
-          try {
-            await googleAuthService.refreshToken();
-            const newAccessToken = await googleAuthService.getAccessToken();
-            if (newAccessToken) {
-              // تلاش مجدد با token جدید
-              const retryResponse = await fetch(url, {
-                ...options,
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${newAccessToken}`,
-                  ...options.headers,
-                },
-              });
-              
-              if (retryResponse.ok) {
-                return retryResponse.json();
-              }
-            }
-          } catch (refreshError) {
-            console.error('Error refreshing token:', refreshError);
-          }
-          
           throw new Error('احراز هویت منقضی شده است. لطفاً مجدداً وارد شوید.');
         }
         
@@ -384,6 +361,30 @@ class GoogleSheetsService {
 
   async deleteMessage(id: string): Promise<void> {
     return this.deleteRow('messages', id);
+  }
+
+  async getSMSSettings(): Promise<SheetRow[]> {
+    return this.getSheetData('sms_settings');
+  }
+
+  async addSMSSettings(settings: SheetRow): Promise<SheetRow> {
+    settings.created_at = new Date().toLocaleDateString('fa-IR');
+    settings.updated_at = new Date().toLocaleDateString('fa-IR');
+    return this.appendRow('sms_settings', settings);
+  }
+
+  async updateSMSSettings(id: string, updates: Partial<SheetRow>): Promise<SheetRow> {
+    updates.updated_at = new Date().toLocaleDateString('fa-IR');
+    return this.updateRow('sms_settings', id, updates);
+  }
+
+  async getSMSLogs(): Promise<SheetRow[]> {
+    return this.getSheetData('sms_logs');
+  }
+
+  async addSMSLog(log: SheetRow): Promise<SheetRow> {
+    log.sent_at = new Date().toLocaleDateString('fa-IR');
+    return this.appendRow('sms_logs', log);
   }
 }
 

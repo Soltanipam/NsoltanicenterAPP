@@ -3,8 +3,8 @@ import { PlusCircle, Search, Edit, Trash2, X, Eye, EyeOff, ToggleLeft, ToggleRig
 import { toast } from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
-import { useCustomerStore } from '../../store/customerStore';
 import { useAuthStore } from '../../store/authStore';
+import { useCustomerStore } from '../../store/customerStore';
 import { persianToEnglish } from '../../utils/numberUtils';
 
 const CustomerManagement = () => {
@@ -14,14 +14,12 @@ const CustomerManagement = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
   
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    phone: '',
+    name: '',
+    mobile: '',
     email: '',
-    canLogin: true
+    can_login: true
   });
 
   useEffect(() => {
@@ -36,10 +34,9 @@ const CustomerManagement = () => {
   }, [error, clearError]);
   
   const filteredCustomers = customers.filter(customer => 
-    (customer.firstName || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (customer.lastName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (customer.phone || '').includes(searchQuery) ||
-    (customer.customerId || '').includes(searchQuery)
+    (customer.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (customer.mobile || '').includes(searchQuery) ||
+    (customer.customer_code || '').includes(searchQuery)
   );
   
   const handleEdit = (customer: any) => {
@@ -50,11 +47,10 @@ const CustomerManagement = () => {
     
     setEditingCustomer(customer);
     setFormData({
-      firstName: customer.firstName,
-      lastName: customer.lastName,
-      phone: customer.phone,
+      name: customer.name,
+      mobile: customer.mobile,
       email: customer.email || '',
-      canLogin: customer.canLogin
+      can_login: customer.can_login
     });
     setShowModal(true);
   };
@@ -79,36 +75,34 @@ const CustomerManagement = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    if (!formData.firstName || !formData.lastName || !formData.phone) {
-      toast.error('لطفاً نام، نام خانوادگی و شماره تماس را وارد کنید');
+    if (!formData.name || !formData.mobile) {
+      toast.error('لطفاً نام و شماره موبایل را وارد کنید');
       return;
     }
 
     try {
-      const phoneNumber = persianToEnglish(formData.phone);
+      const mobileNumber = persianToEnglish(formData.mobile);
       
       if (editingCustomer) {
         await updateCustomer(editingCustomer.id, {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          phone: phoneNumber,
+          name: formData.name,
+          mobile: mobileNumber,
           email: formData.email,
-          canLogin: formData.canLogin
+          can_login: formData.can_login
         });
         toast.success('اطلاعات مشتری با موفقیت ویرایش شد');
       } else {
         await addCustomer({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          phone: phoneNumber,
+          name: formData.name,
+          mobile: mobileNumber,
           email: formData.email,
-          canLogin: formData.canLogin
+          can_login: formData.can_login
         });
         toast.success('مشتری جدید با موفقیت ثبت شد');
       }
       setShowModal(false);
       setEditingCustomer(null);
-      setFormData({ firstName: '', lastName: '', phone: '', email: '', canLogin: true });
+      setFormData({ name: '', mobile: '', email: '', can_login: true });
     } catch (error) {
       toast.error('خطا در ذخیره اطلاعات مشتری');
     }
@@ -128,7 +122,7 @@ const CustomerManagement = () => {
             leftIcon={<PlusCircle size={16} />}
             onClick={() => {
               setEditingCustomer(null);
-              setFormData({ firstName: '', lastName: '', phone: '', email: '', canLogin: true });
+              setFormData({ name: '', mobile: '', email: '', can_login: true });
               setShowModal(true);
             }}
             disabled={isLoading}
@@ -164,10 +158,7 @@ const CustomerManagement = () => {
                 نام
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                نام خانوادگی
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                شماره تماس
+                شماره موبایل
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 ایمیل
@@ -186,13 +177,13 @@ const CustomerManagement = () => {
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {isLoading ? (
               <tr>
-                <td colSpan={8} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={7} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                   در حال بارگذاری...
                 </td>
               </tr>
             ) : filteredCustomers.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={7} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                   مشتری‌ای یافت نشد
                 </td>
               </tr>
@@ -200,23 +191,20 @@ const CustomerManagement = () => {
               filteredCustomers.map((customer) => (
                 <tr key={customer.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {customer.customerId}
+                    {customer.customer_code}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium">{customer.firstName}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium">{customer.lastName}</div>
+                    <div className="font-medium">{customer.name}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm ltr">
-                    {customer.phone}
+                    {customer.mobile}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {customer.email || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      {customer.canLogin ? (
+                      {customer.can_login ? (
                         <div className="flex items-center text-green-600">
                           <ToggleRight size={20} />
                           <span className="mr-1 text-sm">فعال</span>
@@ -230,7 +218,7 @@ const CustomerManagement = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {customer.createdAt}
+                    {customer.created_at}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                     <div className="flex items-center justify-end space-x-reverse space-x-2">
@@ -291,8 +279,8 @@ const CustomerManagement = () => {
                   </label>
                   <input
                     type="text"
-                    value={formData.firstName}
-                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="input"
                     required
                   />
@@ -300,25 +288,12 @@ const CustomerManagement = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    نام خانوادگی
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.lastName}
-                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    className="input"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    شماره تماس
+                    شماره موبایل
                   </label>
                   <input
                     type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: persianToEnglish(e.target.value) })}
+                    value={formData.mobile}
+                    onChange={(e) => setFormData({ ...formData, mobile: persianToEnglish(e.target.value) })}
                     className="input"
                     required
                     dir="ltr"
@@ -341,12 +316,12 @@ const CustomerManagement = () => {
                 <div className="flex items-center">
                   <input
                     type="checkbox"
-                    id="canLogin"
-                    checked={formData.canLogin}
-                    onChange={(e) => setFormData({ ...formData, canLogin: e.target.checked })}
+                    id="can_login"
+                    checked={formData.can_login}
+                    onChange={(e) => setFormData({ ...formData, can_login: e.target.checked })}
                     className="h-4 w-4 text-accent focus:ring-accent"
                   />
-                  <label htmlFor="canLogin" className="mr-2 text-sm font-medium">
+                  <label htmlFor="can_login" className="mr-2 text-sm font-medium">
                     دسترسی ورود به سیستم آنلاین
                   </label>
                 </div>

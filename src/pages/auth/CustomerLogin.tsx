@@ -8,8 +8,8 @@ import Button from '../../components/ui/Button';
 import { persianToEnglish } from '../../utils/numberUtils';
 
 const CustomerLogin = () => {
-  const [customerId, setCustomerId] = useState('');
-  const [phone, setPhone] = useState('');
+  const [customerCode, setCustomerCode] = useState('');
+  const [mobile, setMobile] = useState('');
   
   const { login, isLoading, error, clearError } = useCustomerAuthStore();
   const navigate = useNavigate();
@@ -18,18 +18,18 @@ const CustomerLogin = () => {
     e.preventDefault();
     clearError();
     
-    if (!customerId || !phone) {
-      toast.error('لطفاً شناسه مشتری و شماره تلفن را وارد کنید');
+    if (!customerCode || !mobile) {
+      toast.error('لطفاً کد مشتری و شماره موبایل را وارد کنید');
       return;
     }
     
     // Convert Persian numbers to English
-    const englishCustomerId = persianToEnglish(customerId);
-    const englishPhone = persianToEnglish(phone);
+    const englishCustomerCode = persianToEnglish(customerCode);
+    const englishMobile = persianToEnglish(mobile);
     
-    console.log('Attempting customer login with ID:', englishCustomerId);
+    console.log('Attempting customer login with code:', englishCustomerCode);
     
-    const result = await login(englishCustomerId, englishPhone);
+    const result = await login(englishCustomerCode, englishMobile);
     
     if (result.success) {
       toast.success('با موفقیت وارد شدید');
@@ -71,10 +71,10 @@ const CustomerLogin = () => {
                   نحوه ورود:
                 </p>
                 <div className="text-blue-700 dark:text-blue-300 text-xs space-y-1">
-                  <p><strong>شناسه مشتری:</strong> کد عددی که هنگام پذیرش به شما داده شده</p>
-                  <p><strong>شماره تلفن:</strong> شماره تلفن همراه شما</p>
+                  <p><strong>کد مشتری:</strong> کد عددی که هنگام پذیرش به شما داده شده</p>
+                  <p><strong>شماره موبایل:</strong> شماره موبایل شما</p>
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                    مثال: شناسه ۱۰۰۱ و تلفن ۰۹۱۲۳۴۵۶۷۸۹
+                    مثال: کد ۱۰۰۱ و موبایل ۰۹۱۲۳۴۵۶۷۸۹
                   </p>
                 </div>
               </div>
@@ -83,22 +83,22 @@ const CustomerLogin = () => {
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-1">
-              <label htmlFor="customerId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                شناسه مشتری
+              <label htmlFor="customerCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                کد مشتری
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                   <User size={16} className="text-gray-400" />
                 </div>
                 <input
-                  id="customerId"
-                  name="customerId"
+                  id="customerCode"
+                  name="customerCode"
                   type="text"
                   required
-                  value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
+                  value={customerCode}
+                  onChange={(e) => setCustomerCode(e.target.value)}
                   className="input pr-10 focus:ring-accent focus:border-accent"
-                  placeholder="شناسه مشتری خود را وارد کنید"
+                  placeholder="کد مشتری خود را وارد کنید"
                   dir="ltr"
                   disabled={isLoading}
                 />
@@ -106,22 +106,22 @@ const CustomerLogin = () => {
             </div>
             
             <div className="space-y-1">
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                شماره تلفن همراه
+              <label htmlFor="mobile" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                شماره موبایل
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                   <Phone size={16} className="text-gray-400" />
                 </div>
                 <input
-                  id="phone"
-                  name="phone"
+                  id="mobile"
+                  name="mobile"
                   type="tel"
                   required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
                   className="input pr-10 focus:ring-accent focus:border-accent"
-                  placeholder="شماره تلفن همراه خود را وارد کنید"
+                  placeholder="شماره موبایل خود را وارد کنید"
                   dir="ltr"
                   disabled={isLoading}
                 />
@@ -143,7 +143,7 @@ const CustomerLogin = () => {
             </div>
 
             <div className="text-sm text-center text-gray-500 dark:text-gray-400">
-              <p>شناسه مشتری و شماره تلفن خود را از پذیرش دریافت کنید</p>
+              <p>کد مشتری و شماره موبایل خود را از پذیرش دریافت کنید</p>
               <button
                 type="button"
                 onClick={() => navigate('/login')}

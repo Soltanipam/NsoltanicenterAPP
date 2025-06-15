@@ -5,13 +5,12 @@ import { googleSheetsService } from '../services/googleSheets';
 
 export interface Customer {
   id: string;
-  customerId: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
+  customer_code: string;
+  name: string;
+  mobile: string;
   email?: string;
-  canLogin: boolean;
-  createdAt: string;
+  can_login: boolean;
+  created_at: string;
 }
 
 interface CustomerAuthState {
@@ -19,7 +18,7 @@ interface CustomerAuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  login: (customerId: string, phone: string) => Promise<{ success: boolean; message?: string }>;
+  login: (customerCode: string, mobile: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   clearError: () => void;
 }
@@ -32,27 +31,27 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
       isLoading: false,
       error: null,
 
-      login: async (customerId: string, phone: string) => {
+      login: async (customerCode: string, mobile: string) => {
         set({ isLoading: true, error: null });
 
         try {
-          console.log('Customer login attempt:', customerId);
+          console.log('Customer login attempt:', customerCode);
 
           // Query customers from Google Sheets
           const customers = await googleSheetsService.getCustomers();
           const customerData = customers.find(c => 
-            c.code === customerId && c.phone === phone
+            c.customer_code === customerCode && c.mobile === mobile
           );
 
           if (!customerData) {
-            console.log('Customer not found or invalid credentials:', customerId);
-            set({ isLoading: false, error: 'شناسه مشتری یا شماره تلفن اشتباه است' });
-            return { success: false, message: 'شناسه مشتری یا شماره تلفن اشتباه است' };
+            console.log('Customer not found or invalid credentials:', customerCode);
+            set({ isLoading: false, error: 'کد مشتری یا شماره موبایل اشتباه است' });
+            return { success: false, message: 'کد مشتری یا شماره موبایل اشتباه است' };
           }
 
           // Check if customer can login
-          if (customerData.online_access !== 'true') {
-            console.log('Customer login disabled:', customerId);
+          if (customerData.can_login !== 'true') {
+            console.log('Customer login disabled:', customerCode);
             set({ isLoading: false, error: 'دسترسی شما به سیستم آنلاین غیرفعال است' });
             return { success: false, message: 'دسترسی شما به سیستم آنلاین غیرفعال است' };
           }
@@ -60,16 +59,15 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
           // Create customer object for state
           const customer: Customer = {
             id: customerData.id,
-            customerId: customerData.code,
-            firstName: customerData.name.split(' ')[0] || '',
-            lastName: customerData.name.split(' ').slice(1).join(' ') || '',
-            phone: customerData.phone,
+            customer_code: customerData.customer_code,
+            name: customerData.name,
+            mobile: customerData.mobile,
             email: customerData.email,
-            canLogin: customerData.online_access === 'true',
-            createdAt: customerData.created_at
+            can_login: customerData.can_login === 'true',
+            created_at: customerData.created_at
           };
 
-          console.log('Customer login successful:', customer.customerId);
+          console.log('Customer login successful:', customer.customer_code);
           set({ 
             customer, 
             isAuthenticated: true, 

@@ -4,49 +4,25 @@ import { googleSheetsService } from '../services/googleSheets';
 
 interface Reception {
   id: string;
-  customerInfo: {
-    name: string;
-    phone: string;
-    nationalId: string;
-    address: string;
-  };
-  vehicleInfo: {
-    make: string;
-    model: string;
-    year: string;
-    color: string;
-    plateNumber: string;
-    vin: string;
-    mileage: string;
-  };
-  serviceInfo: {
-    description: string;
-    estimatedCompletion?: string;
-    customerComplaints: string[];
-    customerRequests?: string[];
-    signature?: string | null;
-  };
+  customer_info: string;
+  vehicle_info: string;
+  service_info: string;
   status: 'pending' | 'in-progress' | 'completed';
-  createdAt: string;
-  completedAt?: string;
-  completedBy?: string;
-  images?: string[];
-  documents?: string[];
-  billing?: {
-    services: { name: string; price: number; quantity: number }[];
-    parts: { name: string; price: number; quantity: number }[];
-    discount: number;
-    tax: number;
-    total: number;
-  };
+  images?: string;
+  documents?: string;
+  billing?: string;
+  completed_at?: string;
+  completed_by?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface ReceptionStore {
   receptions: Reception[];
-  addReception: (reception: Omit<Reception, 'id' | 'status' | 'createdAt'>) => Promise<void>;
+  addReception: (reception: Omit<Reception, 'id' | 'status' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateReception: (id: string, reception: Partial<Reception>) => Promise<void>;
   deleteReception: (id: string) => Promise<void>;
-  completeReception: (id: string, billing: Reception['billing'], completedBy: string) => Promise<void>;
+  completeReception: (id: string, billing: any, completedBy: string) => Promise<void>;
   setReceptions: (receptions: Reception[]) => void;
   getCompletedReceptions: () => Reception[];
   getActiveReceptions: () => Reception[];
@@ -65,26 +41,28 @@ export const useReceptionStore = create<ReceptionStore>()(
           console.log('Adding reception via Google Sheets:', reception);
           
           const receptionData = {
-            customer_info: JSON.stringify(reception.customerInfo),
-            vehicle_info: JSON.stringify(reception.vehicleInfo),
-            service_info: JSON.stringify(reception.serviceInfo),
+            customer_info: reception.customer_info,
+            vehicle_info: reception.vehicle_info,
+            service_info: reception.service_info,
             status: 'pending',
-            images: reception.images ? JSON.stringify(reception.images) : '[]',
-            documents: reception.documents ? JSON.stringify(reception.documents) : '[]',
-            created_at: new Date().toLocaleDateString('fa-IR')
+            images: reception.images || '',
+            documents: reception.documents || '',
+            created_at: new Date().toLocaleDateString('fa-IR'),
+            updated_at: new Date().toLocaleDateString('fa-IR')
           };
           
           const newReception = await googleSheetsService.addReception(receptionData);
           
           const receptionForStore: Reception = {
             id: newReception.id,
-            customerInfo: reception.customerInfo,
-            vehicleInfo: reception.vehicleInfo,
-            serviceInfo: reception.serviceInfo,
+            customer_info: newReception.customer_info,
+            vehicle_info: newReception.vehicle_info,
+            service_info: newReception.service_info,
             status: 'pending',
-            images: reception.images,
-            documents: reception.documents,
-            createdAt: new Date().toLocaleDateString('fa-IR')
+            images: newReception.images,
+            documents: newReception.documents,
+            created_at: newReception.created_at,
+            updated_at: newReception.updated_at
           };
           
           set((state) => ({
@@ -102,17 +80,19 @@ export const useReceptionStore = create<ReceptionStore>()(
         try {
           console.log('Updating reception via Google Sheets:', id, reception);
           
-          const updateData: any = {};
+          const updateData: any = {
+            updated_at: new Date().toLocaleDateString('fa-IR')
+          };
+          
           if (reception.status) updateData.status = reception.status;
-          if (reception.customerInfo) updateData.customer_info = JSON.stringify(reception.customerInfo);
-          if (reception.vehicleInfo) updateData.vehicle_info = JSON.stringify(reception.vehicleInfo);
-          if (reception.serviceInfo) updateData.service_info = JSON.stringify(reception.serviceInfo);
-          if (reception.images) updateData.images = JSON.stringify(reception.images);
-          if (reception.documents) updateData.documents = JSON.stringify(reception.documents);
-          if (reception.billing) updateData.billing = JSON.stringify(reception.billing);
-          if (reception.completedAt) updateData.completed_at = reception.completedAt;
-          if (reception.completedBy) updateData.completed_by = reception.completedBy;
-          updateData.updated_at = new Date().toLocaleDateString('fa-IR');
+          if (reception.customer_info) updateData.customer_info = reception.customer_info;
+          if (reception.vehicle_info) updateData.vehicle_info = reception.vehicle_info;
+          if (reception.service_info) updateData.service_info = reception.service_info;
+          if (reception.images) updateData.images = reception.images;
+          if (reception.documents) updateData.documents = reception.documents;
+          if (reception.billing) updateData.billing = reception.billing;
+          if (reception.completed_at) updateData.completed_at = reception.completed_at;
+          if (reception.completed_by) updateData.completed_by = reception.completed_by;
           
           await googleSheetsService.updateReception(id, updateData);
           
@@ -154,7 +134,8 @@ export const useReceptionStore = create<ReceptionStore>()(
             status: 'completed',
             billing: JSON.stringify(billing),
             completed_by: completedBy,
-            completed_at: new Date().toLocaleDateString('fa-IR')
+            completed_at: new Date().toLocaleDateString('fa-IR'),
+            updated_at: new Date().toLocaleDateString('fa-IR')
           };
           
           await googleSheetsService.updateReception(id, updateData);
@@ -164,9 +145,10 @@ export const useReceptionStore = create<ReceptionStore>()(
               r.id === id ? {
                 ...r,
                 status: 'completed' as const,
-                billing,
-                completedAt: new Date().toLocaleDateString('fa-IR'),
-                completedBy
+                billing: JSON.stringify(billing),
+                completed_at: new Date().toLocaleDateString('fa-IR'),
+                completed_by: completedBy,
+                updated_at: new Date().toLocaleDateString('fa-IR')
               } : r
             )
           }));
@@ -209,19 +191,7 @@ export const useReceptionStore = create<ReceptionStore>()(
     {
       name: 'reception-storage',
       partialize: (state) => ({
-        receptions: state.receptions.map(reception => ({
-          ...reception,
-          // Exclude large data fields from local storage to prevent quota exceeded
-          images: undefined,
-          documents: undefined,
-          serviceInfo: {
-            ...reception.serviceInfo,
-            // Remove base64 signature data from local storage to prevent quota exceeded
-            signature: reception.serviceInfo.signature?.startsWith('data:image') 
-              ? null 
-              : reception.serviceInfo.signature
-          }
-        }))
+        receptions: state.receptions
       })
     }
   )

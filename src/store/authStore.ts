@@ -14,17 +14,19 @@ export interface User {
   role: UserRole;
   jobDescription?: string;
   permissions?: {
-    canViewReceptions?: boolean;
-    canCreateTask?: boolean;
-    canCreateReception?: boolean;
-    canCompleteServices?: boolean;
-    canManageCustomers?: boolean;
-    canViewHistory?: boolean;
+    can_view_receptions?: boolean;
+    can_create_tasks?: boolean;
+    can_view_tasks?: boolean;
+    can_send_messages?: boolean;
+    can_create_reception?: boolean;
+    can_complete_services?: boolean;
+    can_manage_customers?: boolean;
+    can_view_history?: boolean;
   };
   settings?: {
     sidebarOpen: boolean;
   };
-  auth_user_id?: string;
+  is_active?: boolean;
 }
 
 interface AuthState {
@@ -48,14 +50,17 @@ const DEFAULT_ADMIN_USER: User = {
   role: 'admin',
   jobDescription: 'مدیر کل سیستم',
   permissions: {
-    canViewReceptions: true,
-    canCreateTask: true,
-    canCreateReception: true,
-    canCompleteServices: true,
-    canManageCustomers: true,
-    canViewHistory: true
+    can_view_receptions: true,
+    can_create_tasks: true,
+    can_view_tasks: true,
+    can_send_messages: true,
+    can_create_reception: true,
+    can_complete_services: true,
+    can_manage_customers: true,
+    can_view_history: true
   },
-  settings: { sidebarOpen: true }
+  settings: { sidebarOpen: true },
+  is_active: true
 };
 
 export const useAuthStore = create<AuthState>()(
@@ -135,7 +140,7 @@ export const useAuthStore = create<AuthState>()(
             const cachedUsers = offlineSyncService.getCachedData('users');
             if (cachedUsers) {
               const user = cachedUsers.find((u: any) => 
-                u.username === username && u.active === 'true'
+                u.username === username && u.is_active === 'true'
               );
               
               if (user && user.password && await bcrypt.compare(password, user.password)) {
@@ -147,7 +152,7 @@ export const useAuthStore = create<AuthState>()(
                   jobDescription: user.job_description,
                   permissions: typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || {}),
                   settings: typeof user.settings === 'string' ? JSON.parse(user.settings) : (user.settings || { sidebarOpen: true }),
-                  auth_user_id: user.auth_user_id
+                  is_active: user.is_active === 'true'
                 };
                 
                 offlineSyncService.cacheData('current_user', userForAuth);
@@ -166,13 +171,13 @@ export const useAuthStore = create<AuthState>()(
           try {
             const users = await googleSheetsService.getUsers();
             const userData = users.find((u: any) => 
-              u.username === username && u.active === 'true'
+              u.username === username && u.is_active === 'true'
             );
 
             if (!userData) {
               return { 
                 success: false, 
-                message: 'نام کاربری یافت نشد' 
+                message: 'نام کاربری یافت نشد یا حساب کاربری غیرفعال است' 
               };
             }
 
@@ -204,7 +209,7 @@ export const useAuthStore = create<AuthState>()(
               jobDescription: userData.job_description,
               permissions: typeof userData.permissions === 'string' ? JSON.parse(userData.permissions) : (userData.permissions || {}),
               settings: typeof userData.settings === 'string' ? JSON.parse(userData.settings) : (userData.settings || { sidebarOpen: true }),
-              auth_user_id: userData.auth_user_id
+              is_active: userData.is_active === 'true'
             };
 
             // کش کردن اطلاعات کاربر
