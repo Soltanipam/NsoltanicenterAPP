@@ -1,120 +1,74 @@
-import { JWT } from 'google-auth-library';
+import { google } from 'googleapis';
+import credentials from '../config/credentials.json';
 
 class GoogleDriveService {
-  private baseUrl = 'https://www.googleapis.com/drive/v3';
-  private uploadUrl = 'https://www.googleapis.com/upload/drive/v3';
-  private jwtClient: JWT | null = null;
+  private drive: any;
   private isInitialized = false;
 
-  private async initializeAuth(): Promise<void> {
+  private async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
-      // Try to load credentials from the config file
-      const credentialsResponse = await fetch('/src/config/credentials.json');
-      
-      if (!credentialsResponse.ok) {
-        throw new Error('فایل credentials.json یافت نشد');
-      }
-
-      const credentials = await credentialsResponse.json();
-      
+      // Check if credentials file exists and is valid
       if (!credentials.client_email || !credentials.private_key) {
-        throw new Error('فایل credentials.json معتبر نیست');
+        throw new Error('فایل احراز هویت یافت نشد یا معتبر نیست');
       }
 
-      this.jwtClient = new JWT({
-        email: credentials.client_email,
-        key: credentials.private_key,
-        scopes: [
-          'https://www.googleapis.com/auth/drive.file'
-        ]
-      });
+      // Create JWT client
+      const auth = new google.auth.JWT(
+        credentials.client_email,
+        undefined,
+        credentials.private_key,
+        ['https://www.googleapis.com/auth/drive.file']
+      );
 
-      await this.jwtClient.authorize();
+      // Authorize the client
+      await auth.authorize();
+
+      // Create drive API instance
+      this.drive = google.drive({ version: 'v3', auth });
       this.isInitialized = true;
+
       console.log('Google Drive Service Account authentication successful');
     } catch (error) {
-      console.error('Error initializing Google Drive authentication:', error);
+      console.error('Error initializing Google Drive:', error);
       throw error;
     }
   }
 
-  private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    await this.initializeAuth();
-
-    if (!this.jwtClient) {
-      throw new Error('احراز هویت Google Drive انجام نشده است');
-    }
-
-    const accessToken = await this.jwtClient.getAccessToken();
-    
-    const url = `${this.baseUrl}${endpoint}`;
-    
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${accessToken.token}`,
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(error.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
   async uploadFile(file: File, folderName?: string): Promise<string> {
     try {
-      await this.initializeAuth();
-
-      if (!this.jwtClient) {
-        throw new Error('احراز هویت Google Drive انجام نشده است');
-      }
-
-      const accessToken = await this.jwtClient.getAccessToken();
+      await this.initialize();
 
       // Create form data for file upload
-      const formData = new FormData();
-      
-      const metadata = {
+      const fileMetadata = {
         name: file.name,
         parents: folderName ? [folderName] : undefined
       };
-      
-      formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      formData.append('file', file);
 
-      const response = await fetch(`${this.uploadUrl}/files?uploadType=multipart`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken.token}`,
-        },
-        body: formData
+      const media = {
+        mimeType: file.type,
+        body: file.stream()
+      };
+
+      const response = await this.drive.files.create({
+        requestBody: fileMetadata,
+        media: media,
+        fields: 'id'
       });
 
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
+      const fileId = response.data.id;
 
-      const result = await response.json();
-      
       // Make the file publicly accessible
-      await this.makeRequest(`/files/${result.id}/permissions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      await this.drive.permissions.create({
+        fileId: fileId,
+        requestBody: {
           role: 'reader',
           type: 'anyone'
-        })
+        }
       });
 
-      return `https://drive.google.com/uc?id=${result.id}`;
+      return `https://drive.google.com/uc?id=${fileId}`;
     } catch (error) {
       console.error('Error uploading file to Google Drive:', error);
       throw error;
@@ -128,12 +82,14 @@ class GoogleDriveService {
 
   async deleteFile(fileId: string): Promise<void> {
     try {
+      await this.initialize();
+
       const id = fileId.includes('drive.google.com') 
         ? fileId.match(/id=([a-zA-Z0-9-_]+)/)?.[1] || fileId
         : fileId;
 
-      await this.makeRequest(`/files/${id}`, {
-        method: 'DELETE'
+      await this.drive.files.delete({
+        fileId: id
       });
     } catch (error) {
       console.error('Error deleting file from Google Drive:', error);
@@ -143,11 +99,18 @@ class GoogleDriveService {
 
   async getFileInfo(fileId: string): Promise<any> {
     try {
+      await this.initialize();
+
       const id = fileId.includes('drive.google.com') 
         ? fileId.match(/id=([a-zA-Z0-9-_]+)/)?.[1] || fileId
         : fileId;
 
-      return await this.makeRequest(`/files/${id}?fields=id,name,size,mimeType,createdTime,modifiedTime`);
+      const response = await this.drive.files.get({
+        fileId: id,
+        fields: 'id,name,size,mimeType,createdTime,modifiedTime'
+      });
+
+      return response.data;
     } catch (error) {
       console.error('Error getting file info:', error);
       throw error;

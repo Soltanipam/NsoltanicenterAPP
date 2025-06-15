@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
-import { googleSheetsService } from '../services/googleSheets';
+import { googleSheetsService } from '../lib/googleSheets';
 
 export interface Customer {
   id: string;
@@ -41,7 +41,7 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
           // Query customers from Google Sheets
           const customers = await googleSheetsService.getCustomers();
           const customerData = customers.find(c => 
-            c.code === customerCode && c.phone === mobile
+            c.customer_id === customerCode && c.phone === mobile
           );
 
           if (!customerData) {
@@ -60,9 +60,9 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
           // Create customer object for state
           const customer: Customer = {
             id: customerData.id,
-            customerId: customerData.code,
-            firstName: customerData.name.split(' ')[0] || '',
-            lastName: customerData.name.split(' ').slice(1).join(' ') || '',
+            customerId: customerData.customer_id,
+            firstName: customerData.first_name || '',
+            lastName: customerData.last_name || '',
             phone: customerData.phone,
             email: customerData.email,
             canLogin: customerData.can_login === 'true',
