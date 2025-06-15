@@ -18,11 +18,11 @@ class GoogleSheetsService {
       throw new Error('کاربر آفلاین است');
     }
 
-    // اگر API key یا token نداریم، از API key استفاده کنیم
+    // بررسی وجود API key
     const apiKey = GOOGLE_CONFIG.API_KEY;
     
-    if (!apiKey) {
-      throw new Error('Google API key is not configured. Please set VITE_GOOGLE_API_KEY in your environment variables.');
+    if (!apiKey || apiKey.trim() === '' || apiKey === 'YOUR_ACTUAL_GOOGLE_API_KEY') {
+      throw new Error('Google API key is not configured. Please set VITE_GOOGLE_API_KEY in your .env file with a valid API key from Google Cloud Console.');
     }
     
     const url = `${this.baseUrl}/${this.spreadsheetId}${endpoint}`;
@@ -38,6 +38,16 @@ class GoogleSheetsService {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      
+      // بررسی خطاهای مربوط به API key
+      if (response.status === 400 && error.error?.message?.includes('API key not valid')) {
+        throw new Error('API key not valid. Please check your Google API key in the .env file and ensure Google Sheets API is enabled in Google Cloud Console.');
+      }
+      
+      if (response.status === 403) {
+        throw new Error('Access denied. Please check your Google API key permissions and ensure Google Sheets API is enabled.');
+      }
+      
       throw new Error(error.error?.message || `HTTP ${response.status}: ${response.statusText}`);
     }
 
