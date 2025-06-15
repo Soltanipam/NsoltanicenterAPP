@@ -20,5 +20,10 @@ export const GOOGLE_CONFIG = {
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email'
-  ]
+  ],
+
+  // بررسی اینکه آیا OAuth تنظیم شده است یا نه
+  isConfigured(): boolean {
+    return !!(this.CLIENT_ID && this.CLIENT_SECRET && this.API_KEY);
+  }
 };
