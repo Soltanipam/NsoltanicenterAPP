@@ -93,46 +93,11 @@ const Login = () => {
   
   if (isInitializing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-        <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden">
-          <div className="p-6 sm:p-10 text-center">
-            <Logo className="h-24 w-24 mb-4 mx-auto" showSlogan={true} />
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-              راه‌اندازی سیستم
-            </h1>
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto"></div>
-            <p className="text-gray-600 dark:text-gray-400 mt-4">
-              لطفاً صبر کنید...
-            </p>
-            
-            {/* Connection status indicator */}
-            <div className="mt-4 flex items-center justify-center gap-2">
-              {connectionStatus === 'checking' && (
-                <>
-                  <Wifi className="h-4 w-4 text-yellow-500" />
-                  <span className="text-sm text-yellow-600 dark:text-yellow-400">
-                    بررسی اتصال...
-                  </span>
-                </>
-              )}
-              {connectionStatus === 'connected' && (
-                <>
-                  <Wifi className="h-4 w-4 text-green-500" />
-                  <span className="text-sm text-green-600 dark:text-green-400">
-                    متصل
-                  </span>
-                </>
-              )}
-              {connectionStatus === 'disconnected' && (
-                <>
-                  <WifiOff className="h-4 w-4 text-red-500" />
-                  <span className="text-sm text-red-600 dark:text-red-400">
-                    قطع اتصال
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
+          <p className="text-lg">در حال بارگذاری...</p>
+          <p className="text-sm text-gray-500 mt-2">آماده‌سازی سیستم</p>
         </div>
       </div>
     );
@@ -203,13 +168,14 @@ const Login = () => {
               <AlertCircle size={20} className="text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
               <div className="text-sm">
                 <p className="text-blue-800 dark:text-blue-200 font-medium mb-2">
-                  ورود با نام کاربری و رمز عبور:
+                  اطلاعات ورود پیش‌فرض:
                 </p>
                 <div className="text-blue-700 dark:text-blue-300 text-xs space-y-1">
-                  <p>• از نام کاربری یا ایمیل خود برای ورود استفاده کنید</p>
-                  <p>• رمز عبور توسط مدیر سیستم تعیین می‌شود</p>
-                  <p>• اطلاعات شما در پایگاه داده امن ذخیره می‌شود</p>
-                  <p>• پس از ورود اولیه، می‌توانید در حالت آفلاین کار کنید</p>
+                  <p><strong>نام کاربری:</strong> admin</p>
+                  <p><strong>رمز عبور:</strong> admin123</p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                    پس از ورود اولیه، می‌توانید در حالت آفلاین کار کنید
+                  </p>
                 </div>
               </div>
             </div>

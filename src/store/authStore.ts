@@ -41,6 +41,25 @@ interface AuthState {
   checkConnection: () => Promise<boolean>;
 }
 
+// Default admin user for initial setup
+const DEFAULT_ADMIN_USER: User = {
+  id: 'admin-default',
+  email: 'admin@soltanicenter.com',
+  username: 'admin',
+  name: 'مدیر سیستم',
+  role: 'admin',
+  jobDescription: 'مدیر کل سیستم',
+  permissions: {
+    canViewReceptions: true,
+    canCreateTask: true,
+    canCreateReception: true,
+    canCompleteServices: true,
+    canManageCustomers: true,
+    canViewHistory: true
+  },
+  settings: { sidebarOpen: true }
+};
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -101,6 +120,14 @@ export const useAuthStore = create<AuthState>()(
       login: async (username: string, password: string) => {
         try {
           console.log('Starting login process for:', username);
+          
+          // بررسی کاربر پیش‌فرض admin
+          if (username === 'admin' && password === 'admin123') {
+            console.log('Default admin login successful');
+            offlineSyncService.cacheData('current_user', DEFAULT_ADMIN_USER);
+            set({ user: DEFAULT_ADMIN_USER, isAuthenticated: true });
+            return { success: true };
+          }
           
           // بررسی اتصال
           const isConnected = await get().checkConnection();
