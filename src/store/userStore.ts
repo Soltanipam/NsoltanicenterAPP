@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { googleSheetsService } from '../services/googleSheetsService';
+import { googleSheetsService } from '../services/googleSheets';
 
 export interface UserPermissions {
   canViewReceptions: boolean;

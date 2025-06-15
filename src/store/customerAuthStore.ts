@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
-import { googleSheetsService } from '../services/googleSheetsService';
+import { googleSheetsService } from '../services/googleSheets';
 
 export interface Customer {
   id: string;
@@ -41,7 +41,7 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
           // Query customers from Google Sheets
           const customers = await googleSheetsService.getCustomers();
           const customerData = customers.find(c => 
-            c.customerId === customerId && c.phone === phone
+            c.code === customerId && c.phone === phone
           );
 
           if (!customerData) {
@@ -51,7 +51,7 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
           }
 
           // Check if customer can login
-          if (!customerData.canLogin) {
+          if (customerData.online_access !== 'true') {
             console.log('Customer login disabled:', customerId);
             set({ isLoading: false, error: 'دسترسی شما به سیستم آنلاین غیرفعال است' });
             return { success: false, message: 'دسترسی شما به سیستم آنلاین غیرفعال است' };
@@ -60,13 +60,13 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
           // Create customer object for state
           const customer: Customer = {
             id: customerData.id,
-            customerId: customerData.customerId,
-            firstName: customerData.firstName,
-            lastName: customerData.lastName,
+            customerId: customerData.code,
+            firstName: customerData.name.split(' ')[0] || '',
+            lastName: customerData.name.split(' ').slice(1).join(' ') || '',
             phone: customerData.phone,
             email: customerData.email,
-            canLogin: customerData.canLogin,
-            createdAt: customerData.createdAt
+            canLogin: customerData.online_access === 'true',
+            createdAt: customerData.created_at
           };
 
           console.log('Customer login successful:', customer.customerId);

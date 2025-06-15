@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { googleSheetsService } from '../services/googleSheetsService';
-import { googleDriveService } from '../services/googleDriveService';
+import { googleSheetsService } from '../services/googleSheets';
+import { googleDriveService } from '../services/googleDrive';
 
 export interface Task {
   id: string;
