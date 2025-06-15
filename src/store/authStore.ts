@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
 import { googleSheetsService } from '../services/googleSheets';
+import { googleAuthService } from '../services/googleAuth';
 import { offlineSyncService } from '../services/offlineSync';
 import bcrypt from 'bcryptjs';
 
@@ -55,6 +56,13 @@ export const useAuthStore = create<AuthState>()(
           
           // بررسی اتصال اینترنت
           if (!navigator.onLine) {
+            set({ connectionStatus: 'disconnected' });
+            return false;
+          }
+
+          // بررسی وجود Google access token
+          const accessToken = googleAuthService.getAccessToken();
+          if (!accessToken) {
             set({ connectionStatus: 'disconnected' });
             return false;
           }
