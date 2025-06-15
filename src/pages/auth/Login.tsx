@@ -5,7 +5,6 @@ import { AlertCircle, Wifi, WifiOff, User, Lock, Eye, EyeOff } from 'lucide-reac
 import { useAuthStore } from '../../store/authStore';
 import Logo from '../../components/ui/Logo';
 import Button from '../../components/ui/Button';
-import { offlineSyncService } from '../../services/offlineSync';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -76,15 +75,13 @@ const Login = () => {
       if (isConnected) {
         toast.success('اتصال برقرار شد');
         await initialize();
-        // تلاش برای sync داده‌های آفلاین
-        await offlineSyncService.syncPendingActions();
       } else {
-        setError('همچنان خطا در اتصال به سرور وجود دارد');
-        toast.error('خطا در اتصال به سرور');
+        setError('همچنان خطا در اتصال به Google Sheets وجود دارد');
+        toast.error('خطا در اتصال به Google Sheets');
       }
     } catch (error) {
       console.error('Retry connection error:', error);
-      setError('خطا در اتصال مجدد به سرور');
+      setError('خطا در اتصال مجدد به Google Sheets');
       toast.error('خطا در اتصال مجدد');
     } finally {
       setIsInitializing(false);
@@ -138,7 +135,7 @@ const Login = () => {
                 <>
                   <WifiOff className="h-4 w-4 text-red-500" />
                   <span className="text-sm text-red-600 dark:text-red-400">
-                    قطع اتصال - حالت آفلاین
+                    قطع اتصال - بررسی credentials.json
                   </span>
                 </>
               )}
@@ -174,7 +171,7 @@ const Login = () => {
                   <p><strong>نام کاربری:</strong> admin</p>
                   <p><strong>رمز عبور:</strong> admin123</p>
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                    برای اتصال به Google Sheets، API Key را در فایل .env تنظیم کنید
+                    برای اتصال به Google Sheets، فایل credentials.json را در مسیر src/config قرار دهید
                   </p>
                 </div>
               </div>
@@ -264,12 +261,11 @@ const Login = () => {
             </div>
           </form>
 
-          {/* Offline Mode Info */}
+          {/* Credentials Info */}
           {connectionStatus === 'disconnected' && (
             <div className="mt-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
               <p className="text-yellow-800 dark:text-yellow-200 text-sm">
-                <strong>حالت آفلاین:</strong> برای اتصال به Google Sheets، API Key را در فایل .env تنظیم کنید. 
-                پس از ورود، می‌توانید در حالت آفلاین کار کنید.
+                <strong>نیاز به تنظیم:</strong> برای اتصال به Google Sheets، فایل credentials.json را در مسیر src/config قرار دهید.
               </p>
             </div>
           )}

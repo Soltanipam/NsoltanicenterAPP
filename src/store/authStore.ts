@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
-import { googleSheetsService } from '../services/googleSheets';
-import { offlineSyncService } from '../services/offlineSync';
+import { googleSheetsService } from '../lib/googleSheets';
 import bcrypt from 'bcryptjs';
 
 export type UserRole = 'admin' | 'receptionist' | 'technician' | 'warehouse' | 'detailing' | 'accountant';
@@ -25,7 +24,6 @@ export interface User {
     sidebarOpen: boolean;
   };
   active?: boolean;
-  auth_user_id?: string;
 }
 
 interface AuthState {
@@ -99,15 +97,8 @@ export const useAuthStore = create<AuthState>()(
         try {
           console.log('Initializing auth store...');
           
-          // بررسی اتصال (اما عدم اتصال مانع ادامه نمی‌شود)
+          // بررسی اتصال
           await get().checkConnection();
-          
-          // بررسی وجود کاربر احراز هویت شده در localStorage
-          const savedUser = offlineSyncService.getCachedData('current_user');
-          if (savedUser) {
-            set({ user: savedUser, isAuthenticated: true });
-            console.log('User session restored:', savedUser.username);
-          }
           
           set({ isInitialized: true });
           console.log('Auth store initialized');
@@ -124,7 +115,6 @@ export const useAuthStore = create<AuthState>()(
           // بررسی کاربر پیش‌فرض admin
           if (username === 'admin' && password === 'admin123') {
             console.log('Default admin login successful');
-            offlineSyncService.cacheData('current_user', DEFAULT_ADMIN_USER);
             set({ user: DEFAULT_ADMIN_USER, isAuthenticated: true });
             return { success: true };
           }
@@ -133,35 +123,9 @@ export const useAuthStore = create<AuthState>()(
           const isConnected = await get().checkConnection();
           
           if (!isConnected) {
-            // حالت آفلاین - بررسی کش
-            const cachedUsers = offlineSyncService.getCachedData('users');
-            if (cachedUsers) {
-              const user = cachedUsers.find((u: any) => 
-                u.username === username && u.active === 'true'
-              );
-              
-              if (user && user.password && await bcrypt.compare(password, user.password)) {
-                const userForAuth: User = {
-                  id: user.id,
-                  username: user.username,
-                  name: user.name,
-                  role: user.role || 'technician',
-                  jobDescription: user.job_description,
-                  permissions: typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || {}),
-                  settings: typeof user.settings === 'string' ? JSON.parse(user.settings) : (user.settings || { sidebarOpen: true }),
-                  active: user.active === 'true',
-                  auth_user_id: user.id // Use the same ID for compatibility
-                };
-                
-                offlineSyncService.cacheData('current_user', userForAuth);
-                set({ user: userForAuth, isAuthenticated: true });
-                return { success: true };
-              }
-            }
-            
             return { 
               success: false, 
-              message: 'نام کاربری یا رمز عبور اشتباه است (حالت آفلاین)' 
+              message: 'خطا در ارتباط با Google Sheets. لطفاً فایل credentials.json را بررسی کنید.' 
             };
           }
 
@@ -207,16 +171,9 @@ export const useAuthStore = create<AuthState>()(
               jobDescription: userData.job_description,
               permissions: typeof userData.permissions === 'string' ? JSON.parse(userData.permissions) : (userData.permissions || {}),
               settings: typeof userData.settings === 'string' ? JSON.parse(userData.settings) : (userData.settings || { sidebarOpen: true }),
-              active: userData.active === 'true',
-              auth_user_id: userData.id // Use the same ID for compatibility
+              active: userData.active === 'true'
             };
 
-            // کش کردن اطلاعات کاربر
-            offlineSyncService.cacheData('current_user', user);
-            
-            // کش کردن لیست کاربران برای حالت آفلاین
-            offlineSyncService.cacheData('users', users);
-            
             set({ user, isAuthenticated: true });
             console.log('User login successful:', user.username);
 
@@ -226,7 +183,7 @@ export const useAuthStore = create<AuthState>()(
             console.error('Google Sheets error:', error);
             return { 
               success: false, 
-              message: 'خطا در برقراری ارتباط با Google Sheets. لطفاً API Key را بررسی کنید.' 
+              message: 'خطا در برقراری ارتباط با Google Sheets. لطفاً فایل credentials.json را بررسی کنید.' 
             };
           }
 
@@ -242,7 +199,6 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         try {
           console.log('User logging out');
-          offlineSyncService.clearCache();
           set({ user: null, isAuthenticated: false });
         } catch (error) {
           console.error('Logout error:', error);
@@ -253,7 +209,6 @@ export const useAuthStore = create<AuthState>()(
       
       updateUser: (updatedUser: User) => {
         set({ user: updatedUser });
-        offlineSyncService.cacheData('current_user', updatedUser);
       },
 
       updateUserSettings: async (settings: Partial<User['settings']>) => {
@@ -268,7 +223,6 @@ export const useAuthStore = create<AuthState>()(
           };
           
           set({ user: updatedUser });
-          offlineSyncService.cacheData('current_user', updatedUser);
           
           // به‌روزرسانی در Google Sheets
           if (get().connectionStatus === 'connected') {
@@ -278,17 +232,7 @@ export const useAuthStore = create<AuthState>()(
               });
             } catch (error) {
               console.error('Error updating user settings:', error);
-              // در صورت خطا، برای sync بعدی ذخیره کنیم
-              offlineSyncService.queueAction('update', 'users', {
-                id: currentUser.id,
-                settings: updatedUser.settings
-              });
             }
-          } else {
-            offlineSyncService.queueAction('update', 'users', {
-              id: currentUser.id,
-              settings: updatedUser.settings
-            });
           }
         }
       }

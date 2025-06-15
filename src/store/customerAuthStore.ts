@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
-import { googleSheetsService } from '../services/googleSheets';
+import { googleSheetsService } from '../lib/googleSheets';
 
 export interface Customer {
   id: string;
@@ -83,11 +83,11 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
           console.error('Customer login error:', error);
           set({ 
             isLoading: false, 
-            error: 'خطا در برقراری ارتباط با سرور' 
+            error: 'خطا در برقراری ارتباط با Google Sheets' 
           });
           return { 
             success: false, 
-            message: 'خطا در برقراری ارتباط با سرور' 
+            message: 'خطا در برقراری ارتباط با Google Sheets' 
           };
         }
       },
