@@ -1,24 +1,19 @@
 export const GOOGLE_CONFIG = {
+  // شناسه Google Sheets شما
   SPREADSHEET_ID: '16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w',
-  DRIVE_FOLDER_ID: 'your-drive-folder-id', // فولدر اصلی برای ذخیره فایل‌ها
+  
+  // اطلاعات OAuth که باید از Google Cloud Console دریافت کنید
+  CLIENT_ID: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+  CLIENT_SECRET: 'YOUR_GOOGLE_CLIENT_SECRET',
+  
+  // URL های مجاز برای redirect
+  REDIRECT_URI: window.location.origin + '/auth/callback',
+  
+  // دسترسی‌های مورد نیاز
   SCOPES: [
     'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email'
-  ],
-  SHEETS: {
-    USERS: 'users',
-    CUSTOMERS: 'customers', 
-    RECEPTIONS: 'receptions',
-    TASKS: 'tasks',
-    MESSAGES: 'messages',
-    SMS_SETTINGS: 'sms_settings',
-    SMS_LOGS: 'sms_logs'
-  }
-};
-
-export const GOOGLE_CLIENT_CONFIG = {
-  client_id: 'your-google-oauth-client-id.apps.googleusercontent.com',
-  redirect_uri: window.location.origin + '/auth/callback'
+  ]
 };

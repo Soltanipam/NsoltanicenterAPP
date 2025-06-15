@@ -4,6 +4,7 @@ import { Moon, Sun } from 'lucide-react';
 
 import Layout from './components/layout/Layout';
 import Login from './pages/auth/Login';
+import GoogleCallback from './pages/auth/GoogleCallback';
 import CustomerLogin from './pages/auth/CustomerLogin';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
 import Dashboard from './pages/dashboard/Dashboard';
@@ -106,6 +107,9 @@ function App() {
         <Routes>
           {/* Staff Login */}
           <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} />
+          
+          {/* Google OAuth Callback */}
+          <Route path="/auth/callback" element={<GoogleCallback />} />
           
           {/* Customer Login */}
           <Route path="/customer-login" element={isCustomerAuthenticated ? <Navigate to="/customer-dashboard" /> : <CustomerLogin />} />
