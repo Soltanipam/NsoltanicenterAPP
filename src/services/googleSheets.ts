@@ -1,4 +1,5 @@
 import { GOOGLE_CONFIG } from '../config/googleConfig';
+import { googleAuthService } from './googleAuth';
 
 export interface SheetRow {
   [key: string]: string | number | boolean | null;
@@ -14,40 +15,125 @@ class GoogleSheetsService {
       throw new Error('کاربر آفلاین است');
     }
 
-    // بررسی وجود API key
-    const apiKey = GOOGLE_CONFIG.API_KEY;
+    const isWriteOperation = ['POST', 'PUT', 'DELETE'].includes(options.method || 'GET');
     
-    if (!apiKey || apiKey.trim() === '' || apiKey === 'your_google_api_key_here') {
-      throw new Error('Google API key تنظیم نشده است. لطفاً VITE_GOOGLE_API_KEY را در فایل .env تنظیم کنید.');
-    }
-    
-    const url = `${this.baseUrl}/${this.spreadsheetId}${endpoint}`;
-    const finalUrl = url + (url.includes('?') ? '&' : '?') + `key=${apiKey}`;
-    
-    const response = await fetch(finalUrl, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
+    // برای عملیات نوشتن، OAuth 2.0 الزامی است
+    if (isWriteOperation) {
+      const accessToken = await googleAuthService.getAccessToken();
+      if (!accessToken) {
+        throw new Error('برای انجام این عملیات، ابتدا باید وارد حساب Google خود شوید.');
+      }
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      const url = `${this.baseUrl}/${this.spreadsheetId}${endpoint}`;
       
-      // بررسی خطاهای مربوط به API key
-      if (response.status === 400 && error.error?.message?.includes('API key not valid')) {
-        throw new Error('API key معتبر نیست. لطفاً Google API key خود را در فایل .env بررسی کنید و مطمئن شوید که Google Sheets API فعال است.');
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+        
+        if (response.status === 401) {
+          // Token منقضی شده، تلاش برای تجدید
+          try {
+            await googleAuthService.refreshToken();
+            const newAccessToken = await googleAuthService.getAccessToken();
+            if (newAccessToken) {
+              // تلاش مجدد با token جدید
+              const retryResponse = await fetch(url, {
+                ...options,
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${newAccessToken}`,
+                  ...options.headers,
+                },
+              });
+              
+              if (retryResponse.ok) {
+                return retryResponse.json();
+              }
+            }
+          } catch (refreshError) {
+            console.error('Error refreshing token:', refreshError);
+          }
+          
+          throw new Error('احراز هویت منقضی شده است. لطفاً مجدداً وارد شوید.');
+        }
+        
+        if (response.status === 403) {
+          throw new Error('دسترسی رد شد. لطفاً مجوزهای Google API خود را بررسی کنید.');
+        }
+        
+        throw new Error(error.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return response.json();
+    } else {
+      // برای عملیات خواندن، ابتدا OAuth را امتحان کنیم، سپس API key
+      try {
+        const accessToken = await googleAuthService.getAccessToken();
+        if (accessToken) {
+          const url = `${this.baseUrl}/${this.spreadsheetId}${endpoint}`;
+          
+          const response = await fetch(url, {
+            ...options,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+              ...options.headers,
+            },
+          });
+
+          if (response.ok) {
+            return response.json();
+          }
+          
+          // اگر OAuth ناموفق بود، به API key برگردیم
+        }
+      } catch (oauthError) {
+        console.warn('OAuth failed, falling back to API key:', oauthError);
+      }
+
+      // Fallback به API key برای عملیات خواندن
+      const apiKey = GOOGLE_CONFIG.API_KEY;
+      
+      if (!apiKey || apiKey.trim() === '' || apiKey === 'your_google_api_key_here') {
+        throw new Error('Google API key تنظیم نشده است. لطفاً VITE_GOOGLE_API_KEY را در فایل .env تنظیم کنید.');
       }
       
-      if (response.status === 403) {
-        throw new Error('دسترسی رد شد. لطفاً مجوزهای Google API key خود را بررسی کنید.');
-      }
+      const url = `${this.baseUrl}/${this.spreadsheetId}${endpoint}`;
+      const finalUrl = url + (url.includes('?') ? '&' : '?') + `key=${apiKey}`;
       
-      throw new Error(error.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-    }
+      const response = await fetch(finalUrl, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
 
-    return response.json();
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // بررسی خطاهای مربوط به API key
+        if (response.status === 400 && error.error?.message?.includes('API key not valid')) {
+          throw new Error('API key معتبر نیست. لطفاً Google API key خود را در فایل .env بررسی کنید و مطمئن شوید که Google Sheets API فعال است.');
+        }
+        
+        if (response.status === 403) {
+          throw new Error('دسترسی رد شد. لطفاً مجوزهای Google API key خود را بررسی کنید.');
+        }
+        
+        throw new Error(error.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return response.json();
+    }
   }
 
   async getSheetData(sheetName: string): Promise<SheetRow[]> {
