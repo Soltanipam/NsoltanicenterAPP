@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
 import { googleSheetsService } from '../services/googleSheets';
-import { googleAuthService } from '../services/googleAuth';
 import { offlineSyncService } from '../services/offlineSync';
 import bcrypt from 'bcryptjs';
 
@@ -61,7 +60,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           // بررسی وجود Google access token
-          const accessToken = googleAuthService.getAccessToken();
+          const accessToken = localStorage.getItem('google_access_token');
           if (!accessToken) {
             set({ connectionStatus: 'disconnected' });
             return false;
@@ -113,19 +112,19 @@ export const useAuthStore = create<AuthState>()(
             const cachedUsers = offlineSyncService.getCachedData('users');
             if (cachedUsers) {
               const user = cachedUsers.find((u: any) => 
-                (u.username === username || u.email === username) && u.active
+                (u.username === username || u.email === username) && u.active === 'true'
               );
               
               if (user && user.password && await bcrypt.compare(password, user.password)) {
                 const userForAuth: User = {
                   id: user.id,
-                  email: user.email,
+                  email: user.email || '',
                   username: user.username,
                   name: user.name,
-                  role: user.role,
-                  jobDescription: user.jobDescription,
-                  permissions: user.permissions || {},
-                  settings: user.settings || { sidebarOpen: true },
+                  role: user.role || 'technician',
+                  jobDescription: user.job_description,
+                  permissions: user.permissions ? JSON.parse(user.permissions) : {},
+                  settings: user.settings ? JSON.parse(user.settings) : { sidebarOpen: true },
                   auth_user_id: user.auth_user_id
                 };
                 
@@ -173,10 +172,10 @@ export const useAuthStore = create<AuthState>()(
           // ایجاد شیء کاربر
           const user: User = {
             id: userData.id,
-            email: userData.email,
+            email: userData.email || '',
             username: userData.username,
             name: userData.name,
-            role: userData.role as UserRole,
+            role: userData.role as UserRole || 'technician',
             jobDescription: userData.job_description,
             permissions: userData.permissions ? JSON.parse(userData.permissions) : {},
             settings: userData.settings ? JSON.parse(userData.settings) : { sidebarOpen: true },
