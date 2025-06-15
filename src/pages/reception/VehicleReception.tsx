@@ -8,7 +8,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useCustomerStore } from '../../store/customerStore';
 import { useReceptionStore } from '../../store/receptionStore';
 import { persianToEnglish } from '../../utils/numberUtils';
-import { uploadFile } from '../../lib/supabase';
+import { googleDriveService } from '../../services/googleDrive';
 import SignatureCanvas from 'react-signature-canvas';
 import { toast } from 'react-hot-toast';
 
@@ -112,7 +112,7 @@ const VehicleReception = () => {
   const years = Array.from({ length: 30 }, (_, i) => (new Date().getFullYear() - i).toString());
 
   const uploadFiles = async (files: File[], path: string): Promise<string[]> => {
-    const uploadPromises = files.map(file => uploadFile(file, path));
+    const uploadPromises = files.map(file => googleDriveService.uploadFile(file, path));
     const results = await Promise.all(uploadPromises);
     return results.filter(url => url !== null) as string[];
   };
