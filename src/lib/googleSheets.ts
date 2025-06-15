@@ -11,7 +11,7 @@ class GoogleSheetsService {
   private isInitialized = false;
 
   constructor() {
-    this.spreadsheetId = import.meta.env.VITE_GOOGLE_SPREADSHEET_ID || '';
+    this.spreadsheetId = import.meta.env.VITE_GOOGLE_SPREADSHEET_ID || '16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w';
   }
 
   private async initialize(): Promise<void> {
