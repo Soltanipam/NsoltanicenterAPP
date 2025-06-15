@@ -1,12 +1,18 @@
+import { GOOGLE_CONFIG } from '../config/googleConfig';
+
 class GoogleDriveService {
   private baseUrl = 'https://www.googleapis.com/drive/v3';
   private uploadUrl = 'https://www.googleapis.com/upload/drive/v3';
-  private apiKey = 'YOUR_API_KEY'; // باید از محیط خوانده شود
+  private apiKey = GOOGLE_CONFIG.API_KEY;
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
     // در حالت آفلاین، خطا بدهیم
     if (!navigator.onLine) {
       throw new Error('کاربر آفلاین است');
+    }
+
+    if (!this.apiKey) {
+      throw new Error('Google API key is not configured. Please set VITE_GOOGLE_API_KEY in your environment variables.');
     }
 
     const url = `${this.baseUrl}${endpoint}`;
@@ -33,6 +39,10 @@ class GoogleDriveService {
       // در حالت آفلاین، خطا بدهیم
       if (!navigator.onLine) {
         throw new Error('کاربر آفلاین است');
+      }
+
+      if (!this.apiKey) {
+        throw new Error('Google API key is not configured. Please set VITE_GOOGLE_API_KEY in your environment variables.');
       }
 
       // ایجاد فولدر در صورت نیاز

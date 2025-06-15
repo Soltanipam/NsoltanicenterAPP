@@ -1,10 +1,12 @@
+import { GOOGLE_CONFIG } from '../config/googleConfig';
+
 export interface SheetRow {
   [key: string]: string | number | boolean | null;
 }
 
 class GoogleSheetsService {
   private baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
-  private spreadsheetId = '16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w';
+  private spreadsheetId = GOOGLE_CONFIG.SPREADSHEET_ID;
 
   private getAccessToken(): string | null {
     return localStorage.getItem('google_access_token');
@@ -17,7 +19,11 @@ class GoogleSheetsService {
     }
 
     // اگر API key یا token نداریم، از API key استفاده کنیم
-    const apiKey = 'YOUR_API_KEY'; // باید از محیط خوانده شود
+    const apiKey = GOOGLE_CONFIG.API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('Google API key is not configured. Please set VITE_GOOGLE_API_KEY in your environment variables.');
+    }
     
     const url = `${this.baseUrl}/${this.spreadsheetId}${endpoint}`;
     const finalUrl = url + (url.includes('?') ? '&' : '?') + `key=${apiKey}`;
