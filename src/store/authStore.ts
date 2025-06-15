@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
-import { googleSheetsService } from '../services/googleSheets';
+import { supabase } from '../lib/supabase';
 import { offlineSyncService } from '../services/offlineSync';
 import bcrypt from 'bcryptjs';
 
@@ -59,13 +59,18 @@ export const useAuthStore = create<AuthState>()(
             return false;
           }
 
-          // تست اتصال به Google Sheets
+          // تست اتصال به Supabase
           try {
-            await googleSheetsService.getUsers();
+            const { error } = await supabase.from('users').select('count').limit(1);
+            if (error) {
+              console.error('Connection to Supabase failed:', error);
+              set({ connectionStatus: 'disconnected' });
+              return false;
+            }
             set({ connectionStatus: 'connected' });
             return true;
           } catch (error) {
-            console.error('Connection to Google Sheets failed:', error);
+            console.error('Connection to Supabase failed:', error);
             set({ connectionStatus: 'disconnected' });
             return false;
           }
@@ -121,8 +126,8 @@ export const useAuthStore = create<AuthState>()(
                   name: user.name,
                   role: user.role || 'technician',
                   jobDescription: user.job_description,
-                  permissions: user.permissions ? JSON.parse(user.permissions) : {},
-                  settings: user.settings ? JSON.parse(user.settings) : { sidebarOpen: true },
+                  permissions: user.permissions || {},
+                  settings: user.settings || { sidebarOpen: true },
                   auth_user_id: user.auth_user_id
                 };
                 
@@ -138,28 +143,43 @@ export const useAuthStore = create<AuthState>()(
             };
           }
 
-          // حالت آنلاین - بررسی Google Sheets
-          const users = await googleSheetsService.getUsers();
-          const userData = users.find((u: any) => 
-            (u.username === username || u.email === username) && u.active === 'true'
-          );
+          // حالت آنلاین - بررسی Supabase
+          const { data: users, error } = await supabase
+            .from('users')
+            .select('*')
+            .or(`username.eq.${username},email.eq.${username}`)
+            .eq('active', true)
+            .limit(1);
 
-          if (!userData) {
+          if (error) {
+            console.error('Database error:', error);
+            return { 
+              success: false, 
+              message: 'خطا در برقراری ارتباط با پایگاه داده' 
+            };
+          }
+
+          if (!users || users.length === 0) {
             return { 
               success: false, 
               message: 'نام کاربری یا ایمیل یافت نشد' 
             };
           }
 
-          // بررسی رمز عبور
-          if (!userData.password) {
-            return { 
-              success: false, 
-              message: 'رمز عبور برای این کاربر تنظیم نشده است' 
-            };
+          const userData = users[0];
+
+          // بررسی رمز عبور - اگر رمز عبور hash شده باشد
+          let isPasswordValid = false;
+          if (userData.password) {
+            try {
+              // تلاش برای بررسی hash
+              isPasswordValid = await bcrypt.compare(password, userData.password);
+            } catch (error) {
+              // اگر hash نبود، مقایسه مستقیم
+              isPasswordValid = userData.password === password;
+            }
           }
 
-          const isPasswordValid = await bcrypt.compare(password, userData.password);
           if (!isPasswordValid) {
             return { 
               success: false, 
@@ -175,14 +195,19 @@ export const useAuthStore = create<AuthState>()(
             name: userData.name,
             role: userData.role as UserRole || 'technician',
             jobDescription: userData.job_description,
-            permissions: userData.permissions ? JSON.parse(userData.permissions) : {},
-            settings: userData.settings ? JSON.parse(userData.settings) : { sidebarOpen: true },
+            permissions: userData.permissions || {},
+            settings: userData.settings || { sidebarOpen: true },
             auth_user_id: userData.auth_user_id
           };
 
-          // کش کردن اطلاعات کاربر و لیست کاربران
+          // کش کردن اطلاعات کاربر
           offlineSyncService.cacheData('current_user', user);
-          offlineSyncService.cacheData('users', users);
+          
+          // کش کردن لیست کاربران برای حالت آفلاین
+          const { data: allUsers } = await supabase.from('users').select('*');
+          if (allUsers) {
+            offlineSyncService.cacheData('users', allUsers);
+          }
           
           set({ user, isAuthenticated: true });
           console.log('User login successful:', user.username);
@@ -215,7 +240,7 @@ export const useAuthStore = create<AuthState>()(
         offlineSyncService.cacheData('current_user', updatedUser);
       },
 
-      updateUserSettings: (settings: Partial<User['settings']>) => {
+      updateUserSettings: async (settings: Partial<User['settings']>) => {
         const currentUser = get().user;
         if (currentUser) {
           const updatedUser = {
@@ -229,22 +254,33 @@ export const useAuthStore = create<AuthState>()(
           set({ user: updatedUser });
           offlineSyncService.cacheData('current_user', updatedUser);
           
-          // به‌روزرسانی در Google Sheets
-          if (offlineSyncService.isConnected()) {
-            googleSheetsService.updateUser(currentUser.id, {
-              settings: JSON.stringify(updatedUser.settings)
-            }).catch(error => {
+          // به‌روزرسانی در Supabase
+          if (get().connectionStatus === 'connected') {
+            try {
+              const { error } = await supabase
+                .from('users')
+                .update({ settings: updatedUser.settings })
+                .eq('id', currentUser.id);
+                
+              if (error) {
+                console.error('Error updating user settings:', error);
+                // در صورت خطا، برای sync بعدی ذخیره کنیم
+                offlineSyncService.queueAction('update', 'users', {
+                  id: currentUser.id,
+                  settings: updatedUser.settings
+                });
+              }
+            } catch (error) {
               console.error('Error updating user settings:', error);
-              // در صورت خطا، برای sync بعدی ذخیره کنیم
               offlineSyncService.queueAction('update', 'users', {
                 id: currentUser.id,
-                settings: JSON.stringify(updatedUser.settings)
+                settings: updatedUser.settings
               });
-            });
+            }
           } else {
             offlineSyncService.queueAction('update', 'users', {
               id: currentUser.id,
-              settings: JSON.stringify(updatedUser.settings)
+              settings: updatedUser.settings
             });
           }
         }
