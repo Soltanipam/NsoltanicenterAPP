@@ -1,4 +1,5 @@
 import { GOOGLE_CONFIG } from '../config/googleConfig';
+import { googleAuthService } from './googleAuth';
 
 export interface SheetRow {
   [key: string]: string | number | boolean | null;
@@ -8,8 +9,29 @@ class GoogleSheetsService {
   private baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
   private spreadsheetId = GOOGLE_CONFIG.SPREADSHEET_ID;
 
-  private getAccessToken(): string | null {
-    return localStorage.getItem('google_access_token');
+  private async getValidAccessToken(): Promise<string> {
+    // Try to get current access token
+    let accessToken = localStorage.getItem('google_access_token');
+    
+    if (!accessToken) {
+      throw new Error('No access token found. Please authenticate with Google first.');
+    }
+
+    // Check if token is expired and refresh if needed
+    const tokenExpiry = localStorage.getItem('google_token_expiry');
+    if (tokenExpiry && Date.now() >= parseInt(tokenExpiry)) {
+      try {
+        await googleAuthService.refreshToken();
+        accessToken = localStorage.getItem('google_access_token');
+        if (!accessToken) {
+          throw new Error('Failed to refresh access token');
+        }
+      } catch (error) {
+        throw new Error('Access token expired and refresh failed. Please re-authenticate with Google.');
+      }
+    }
+
+    return accessToken;
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
@@ -18,20 +40,16 @@ class GoogleSheetsService {
       throw new Error('کاربر آفلاین است');
     }
 
-    // بررسی وجود API key
-    const apiKey = GOOGLE_CONFIG.API_KEY;
-    
-    if (!apiKey || apiKey.trim() === '' || apiKey === 'YOUR_ACTUAL_GOOGLE_API_KEY') {
-      throw new Error('Google API key is not configured. Please set VITE_GOOGLE_API_KEY in your .env file with a valid API key from Google Cloud Console.');
-    }
+    // Get valid OAuth2 access token
+    const accessToken = await this.getValidAccessToken();
     
     const url = `${this.baseUrl}/${this.spreadsheetId}${endpoint}`;
-    const finalUrl = url + (url.includes('?') ? '&' : '?') + `key=${apiKey}`;
     
-    const response = await fetch(finalUrl, {
+    const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
         ...options.headers,
       },
     });
@@ -39,13 +57,36 @@ class GoogleSheetsService {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unknown error' }));
       
-      // بررسی خطاهای مربوط به API key
-      if (response.status === 400 && error.error?.message?.includes('API key not valid')) {
-        throw new Error('API key not valid. Please check your Google API key in the .env file and ensure Google Sheets API is enabled in Google Cloud Console.');
+      // بررسی خطاهای مربوط به authentication
+      if (response.status === 401) {
+        // Try to refresh token once
+        try {
+          await googleAuthService.refreshToken();
+          const newAccessToken = localStorage.getItem('google_access_token');
+          if (newAccessToken) {
+            // Retry the request with new token
+            const retryResponse = await fetch(url, {
+              ...options,
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${newAccessToken}`,
+                ...options.headers,
+              },
+            });
+            
+            if (retryResponse.ok) {
+              return retryResponse.json();
+            }
+          }
+        } catch (refreshError) {
+          // Refresh failed, user needs to re-authenticate
+        }
+        
+        throw new Error('Authentication failed. Please re-authenticate with Google.');
       }
       
       if (response.status === 403) {
-        throw new Error('Access denied. Please check your Google API key permissions and ensure Google Sheets API is enabled.');
+        throw new Error('Access denied. Please check your Google account permissions for Google Sheets.');
       }
       
       throw new Error(error.error?.message || `HTTP ${response.status}: ${response.statusText}`);
@@ -87,7 +128,7 @@ class GoogleSheetsService {
       // اگر header وجود نداشت، ابتدا آن را ایجاد کنیم
       if (headers.length === 0) {
         const newHeaders = Object.keys(data);
-        await this.makeRequest(`/values/${sheetName}!A1:${this.getColumnLetter(newHeaders.length)}1`, {
+        await this.makeRequest(`/values/${sheetName}!A1:${this.getColumnLetter(newHeaders.length)}1?valueInputOption=RAW`, {
           method: 'PUT',
           body: JSON.stringify({
             values: [newHeaders]
@@ -141,7 +182,7 @@ class GoogleSheetsService {
       const values = headers.map((header: string) => updatedData[header] || '');
 
       const range = `${sheetName}!A${rowIndex + 2}:${this.getColumnLetter(headers.length)}${rowIndex + 2}`;
-      await this.makeRequest(`/values/${range}`, {
+      await this.makeRequest(`/values/${range}?valueInputOption=RAW`, {
         method: 'PUT',
         body: JSON.stringify({
           values: [values]
