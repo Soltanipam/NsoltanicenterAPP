@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { googleSheetsService } from '../services/googleSheets';
+import { googleSheetsService } from '../lib/googleSheets';
 import { googleDriveService } from '../services/googleDrive';
 import { offlineSyncService } from '../services/offlineSync';
 
