@@ -12,6 +12,7 @@
   "dependencies": {
     "@persian-tools/persian-tools": "^3.5.0",
     "bcryptjs": "^2.4.3",
+    "google-auth-library": "^10.1.0",
     "googleapis": "^128.0.0",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
