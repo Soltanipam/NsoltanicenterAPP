@@ -28,27 +28,37 @@ npm install
 5. پس از ایجاد، کلید JSON را دانلود کنید
 
 #### مرحله 4: تنظیم فایل Credentials
-1. فایل JSON دانلود شده را در مسیر `public/config/credentials.json` قرار دهید
+1. فایل JSON دانلود شده را در مسیر `config/credentials.json` قرار دهید
 2. محتوای فایل باید شامل موارد زیر باشد:
 ```json
 {
   "type": "service_account",
-  "project_id": "your-project-id",
-  "private_key_id": "your-private-key-id",
-  "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+  "project_id": "your-actual-project-id",
+  "private_key_id": "your-actual-private-key-id",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nYOUR_ACTUAL_PRIVATE_KEY_CONTENT\n-----END PRIVATE KEY-----\n",
   "client_email": "your-service-account@your-project.iam.gserviceaccount.com",
-  "client_id": "your-client-id",
+  "client_id": "your-actual-client-id",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
   "token_uri": "https://oauth2.googleapis.com/token"
 }
 ```
+
+**⚠️ مهم:** فایل `credentials.json` موجود در پروژه حاوی مقادیر نمونه است و باید با اطلاعات واقعی Service Account خود جایگزین شود.
 
 ### 3. تنظیم Google Sheets
 
 #### ایجاد Google Sheets فایل
 1. یک Google Sheets جدید ایجاد کنید
 2. شناسه فایل را از URL کپی کنید (بین `/d/` و `/edit`)
-3. شناسه را در فایل `src/lib/googleSheets.ts` در متغیر `spreadsheetId` قرار دهید
+3. شناسه را در فایل `src/api/googleSheets.ts` در متغیر `spreadsheetId` قرار دهید
+
+#### **مهم: اشتراک‌گذاری Google Sheets**
+1. در Google Sheets خود، روی دکمه "Share" کلیک کنید
+2. ایمیل Service Account (client_email از فایل credentials.json) را اضافه کنید
+3. **حتماً دسترسی "Editor" را انتخاب کنید**
+4. روی "Send" کلیک کنید
+
+بدون این مرحله، سیستم قادر به اتصال به Google Sheets نخواهد بود.
 
 #### ساختار شیت‌ها
 فایل Google Sheets باید شامل شیت‌های زیر باشد:
@@ -145,26 +155,37 @@ npm run dev
 - پیگیری مراحل تعمیر
 - مشاهده تصاویر و گزارش‌ها
 
-## نکات مهم
-
-1. **امنیت:** فایل `credentials.json` را هرگز در مخزن کد قرار ندهید
-2. **دسترسی:** Service Account باید دسترسی ویرایش به Google Sheets داشته باشد
-3. **شناسه شیت:** حتماً شناسه صحیح Google Sheets را در کد قرار دهید
-4. **نسخه پشتیبان:** از Google Sheets خود نسخه پشتیبان تهیه کنید
-
 ## عیب‌یابی
 
 ### خطای "Failed to load credentials"
-- بررسی کنید که فایل `credentials.json` در مسیر صحیح قرار دارد
-- محتوای فایل را بررسی کنید
+- بررسی کنید که فایل `credentials.json` در مسیر صحیح قرار دارد (`config/credentials.json`)
+- محتوای فایل را بررسی کنید و مطمئن شوید که مقادیر واقعی Service Account را دارد
+- مقادیر نمونه مانند "your-project-id-here" را با اطلاعات واقعی جایگزین کنید
 
 ### خطای "Spreadsheet not found"
-- شناسه Google Sheets را بررسی کنید
-- دسترسی Service Account به فایل را بررسی کنید
+- شناسه Google Sheets را در `src/api/googleSheets.ts` بررسی کنید
+- مطمئن شوید که Google Sheets موجود است و قابل دسترسی است
 
 ### خطای "Permission denied"
-- Service Account باید دسترسی ویرایش داشته باشد
-- API های مورد نیاز را فعال کنید
+- **مهم:** Service Account باید دسترسی "Editor" به Google Sheets داشته باشد
+- Google Sheets را با ایمیل Service Account (client_email) به اشتراک بگذارید
+- API های Google Sheets و Google Drive را در Google Cloud Console فعال کنید
+
+### خطای "Connection timeout"
+- اتصال اینترنت خود را بررسی کنید
+- مطمئن شوید که فایروال یا پروکسی دسترسی به Google APIs را مسدود نکرده است
+
+### خطای "Authentication failed"
+- اطلاعات Service Account در فایل `credentials.json` را بررسی کنید
+- مطمئن شوید که Service Account هنوز فعال است و حذف نشده است
+
+## نکات مهم
+
+1. **امنیت:** فایل `credentials.json` را هرگز در مخزن کد عمومی قرار ندهید
+2. **دسترسی:** Service Account باید دسترسی "Editor" به Google Sheets داشته باشد
+3. **شناسه شیت:** حتماً شناسه صحیح Google Sheets را در کد قرار دهید
+4. **نسخه پشتیبان:** از Google Sheets خود نسخه پشتیبان تهیه کنید
+5. **مقادیر واقعی:** فایل `credentials.json` موجود حاوی مقادیر نمونه است و باید جایگزین شود
 
 ## پشتیبانی
 
