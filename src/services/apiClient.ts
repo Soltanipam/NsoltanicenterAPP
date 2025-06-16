@@ -3,7 +3,8 @@ class APIClient {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = import.meta.env.DEV ? 'http://localhost:3001/api' : '/api';
+    // Use /api for all environments - Vite proxy will handle dev routing
+    this.baseURL = '/api';
   }
 
   private async request(endpoint: string, options: RequestInit = {}) {
