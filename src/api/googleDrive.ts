@@ -12,14 +12,47 @@ class GoogleDriveAPI {
     try {
       console.log('Initializing Google Drive API...');
       
-      // Load credentials from file system (server-side only)
-      const credentialsPath = path.resolve(process.cwd(), 'config', 'credentials.json');
-      
-      if (!fs.existsSync(credentialsPath)) {
-        throw new Error('Credentials file not found at: ' + credentialsPath);
+      // Try multiple credential paths
+      const credentialsPaths = [
+        path.resolve(process.cwd(), 'config', 'credentials.json'),
+        path.resolve(process.cwd(), 'src', 'config', 'credentials.json'),
+        path.resolve(process.cwd(), 'public', 'config', 'credentials.json')
+      ];
+
+      let credentials = null;
+      let credentialsPath = null;
+
+      for (const pathToCheck of credentialsPaths) {
+        if (fs.existsSync(pathToCheck)) {
+          credentialsPath = pathToCheck;
+          break;
+        }
       }
 
-      const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf-8'));
+      if (!credentialsPath) {
+        throw new Error(`Credentials file not found. Searched paths: ${credentialsPaths.join(', ')}`);
+      }
+
+      try {
+        const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
+        credentials = JSON.parse(credentialsContent);
+      } catch (parseError) {
+        throw new Error(`Failed to parse credentials file: ${parseError.message}`);
+      }
+
+      // Validate required credential fields
+      const requiredFields = ['type', 'project_id', 'private_key', 'client_email'];
+      for (const field of requiredFields) {
+        if (!credentials[field]) {
+          throw new Error(`Missing required credential field: ${field}`);
+        }
+      }
+
+      // Check if credentials are placeholder values
+      if (credentials.project_id === 'your-project-id-here' || 
+          credentials.private_key.includes('YOUR_PRIVATE_KEY_CONTENT_HERE')) {
+        throw new Error('Credentials file contains placeholder values. Please update with actual Google service account credentials.');
+      }
       
       this.auth = new google.auth.GoogleAuth({
         credentials,

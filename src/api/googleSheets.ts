@@ -7,7 +7,7 @@ import path from 'path';
 class GoogleSheetsAPI {
   private auth: GoogleAuth | null = null;
   private sheets: any = null;
-  private spreadsheetId: string = '16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w';
+  private spreadsheetId: string = process.env.GOOGLE_SPREADSHEET_ID || '16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w';
   private initialized: boolean = false;
 
   async initialize() {
@@ -28,9 +28,9 @@ class GoogleSheetsAPI {
       let credentials = null;
       let credentialsPath = null;
 
-      for (const path of credentialsPaths) {
-        if (fs.existsSync(path)) {
-          credentialsPath = path;
+      for (const pathToCheck of credentialsPaths) {
+        if (fs.existsSync(pathToCheck)) {
+          credentialsPath = pathToCheck;
           break;
         }
       }
