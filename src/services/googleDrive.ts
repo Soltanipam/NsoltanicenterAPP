@@ -1,78 +1,57 @@
+// Client-side wrapper for Google Drive operations
+import { apiClient } from './apiClient';
+
 class GoogleDriveService {
-  private baseUrl = 'https://www.googleapis.com/drive/v3';
-  private uploadUrl = 'https://www.googleapis.com/upload/drive/v3';
-
-  private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    // در حالت آفلاین، خطا بدهیم
-    if (!navigator.onLine) {
-      throw new Error('کاربر آفلاین است');
-    }
-
-    // For read-only operations, we simulate the API calls
-    console.warn('Google Drive operations require service account authentication. Simulating operation.');
-    
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(error.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
   async uploadFile(file: File, folderName?: string): Promise<string> {
     try {
-      // در حالت آفلاین، خطا بدهیم
-      if (!navigator.onLine) {
-        throw new Error('کاربر آفلاین است');
-      }
-
-      // For read-only API key, we simulate file upload
-      // In a real implementation with service account, you would upload to Google Drive
-      console.warn('File upload requires service account authentication. Simulating upload operation.');
+      const result = await apiClient.uploadFile(file, folderName);
       
-      // Generate a mock URL for the uploaded file
-      const mockFileId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-      return `https://drive.google.com/uc?id=${mockFileId}`;
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to upload file');
+      }
+      
+      return result.data.url;
     } catch (error) {
-      console.error('Error uploading file to Google Drive:', error);
+      console.error('Error uploading file:', error);
       throw error;
     }
   }
 
   async uploadMultipleFiles(files: File[], folderName?: string): Promise<string[]> {
-    const uploadPromises = files.map(file => this.uploadFile(file, folderName));
-    return Promise.all(uploadPromises);
+    try {
+      const result = await apiClient.uploadMultipleFiles(files, folderName);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to upload files');
+      }
+      
+      return result.data.urls;
+    } catch (error) {
+      console.error('Error uploading multiple files:', error);
+      throw error;
+    }
   }
 
   async deleteFile(fileId: string): Promise<void> {
     try {
-      // For read-only API key, we simulate the operation
-      console.warn('File deletion requires service account authentication. Simulating delete operation.');
+      const result = await apiClient.deleteFile(fileId);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete file');
+      }
     } catch (error) {
-      console.error('Error deleting file from Google Drive:', error);
+      console.error('Error deleting file:', error);
       throw error;
     }
   }
 
   async getFileInfo(fileId: string): Promise<any> {
-    try {
-      const id = fileId.includes('drive.google.com') 
-        ? fileId.match(/id=([a-zA-Z0-9-_]+)/)?.[1] || fileId
-        : fileId;
+    // This would need to be implemented on the server side
+    throw new Error('getFileInfo not implemented yet');
+  }
 
-      return await this.makeRequest(`/files/${id}?fields=id,name,size,mimeType,createdTime,modifiedTime`);
-    } catch (error) {
-      console.error('Error getting file info:', error);
-      throw error;
-    }
+  isConnected(): boolean {
+    return navigator.onLine;
   }
 }
 
