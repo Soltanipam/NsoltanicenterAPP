@@ -1,59 +1,75 @@
 import { google } from 'googleapis';
-
-interface GoogleSheetsConfig {
-  spreadsheetId: string;
-  credentials: any;
-}
+import { GoogleAuth } from 'google-auth-library';
 
 class GoogleSheetsService {
-  private auth: any;
-  private sheets: any;
-  private spreadsheetId: string;
-
-  constructor() {
-    this.spreadsheetId = '1your-spreadsheet-id-here'; // Will be configured
-  }
+  private auth: GoogleAuth | null = null;
+  private sheets: any = null;
+  private spreadsheetId: string = '1your-spreadsheet-id-here'; // Replace with your actual spreadsheet ID
 
   async initialize() {
     try {
-      // Load credentials from the config file
+      console.log('Initializing Google Sheets service...');
+      
+      // Load credentials
       const credentials = await this.loadCredentials();
       
       this.auth = new google.auth.GoogleAuth({
         credentials,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+        scopes: [
+          'https://www.googleapis.com/auth/spreadsheets',
+          'https://www.googleapis.com/auth/drive.file'
+        ]
       });
 
       this.sheets = google.sheets({ version: 'v4', auth: this.auth });
+      
+      // Test connection
+      await this.testConnection();
+      
       console.log('Google Sheets service initialized successfully');
     } catch (error) {
       console.error('Failed to initialize Google Sheets service:', error);
-      throw error;
+      throw new Error(`Google Sheets initialization failed: ${error.message}`);
     }
   }
 
   private async loadCredentials() {
     try {
-      // In a real environment, you would load from /config/credentials.json
-      // For now, we'll use environment variables or a mock
       const response = await fetch('/config/credentials.json');
       if (!response.ok) {
-        throw new Error('Credentials file not found');
+        throw new Error(`Credentials file not found. Please ensure credentials.json exists in /config/ directory. Status: ${response.status}`);
       }
-      return await response.json();
+      const credentials = await response.json();
+      
+      // Validate required fields
+      const requiredFields = ['type', 'project_id', 'private_key', 'client_email'];
+      for (const field of requiredFields) {
+        if (!credentials[field]) {
+          throw new Error(`Missing required field '${field}' in credentials.json`);
+        }
+      }
+      
+      return credentials;
     } catch (error) {
       console.error('Failed to load credentials:', error);
-      // Fallback to mock credentials for development
-      return {
-        type: "service_account",
-        project_id: "your-project-id",
-        private_key_id: "your-private-key-id",
-        private_key: "your-private-key",
-        client_email: "your-service-account@your-project.iam.gserviceaccount.com",
-        client_id: "your-client-id",
-        auth_uri: "https://accounts.google.com/o/oauth2/auth",
-        token_uri: "https://oauth2.googleapis.com/token"
-      };
+      throw error;
+    }
+  }
+
+  private async testConnection() {
+    try {
+      // Try to read the spreadsheet metadata to test connection
+      await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+        fields: 'properties.title'
+      });
+    } catch (error) {
+      if (error.code === 404) {
+        throw new Error(`Spreadsheet not found. Please check the spreadsheet ID: ${this.spreadsheetId}`);
+      } else if (error.code === 403) {
+        throw new Error('Permission denied. Please ensure the service account has access to the spreadsheet.');
+      }
+      throw error;
     }
   }
 
@@ -73,23 +89,27 @@ class GoogleSheetsService {
 
       const rows = response.data.values || [];
       if (rows.length === 0) {
+        console.log(`No data found in sheet: ${sheetName}`);
         return [];
       }
 
       // Convert rows to objects using first row as headers
       const headers = rows[0];
-      const data = rows.slice(1).map(row => {
+      const data = rows.slice(1).map((row, index) => {
         const obj: any = {};
-        headers.forEach((header: string, index: number) => {
-          obj[header] = row[index] || '';
+        headers.forEach((header: string, headerIndex: number) => {
+          obj[header] = row[headerIndex] || '';
         });
+        // Add row number for updates/deletes
+        obj._rowNumber = index + 2; // +2 because we skip header and arrays are 0-indexed
         return obj;
       });
 
+      console.log(`Successfully read ${data.length} records from ${sheetName}`);
       return data;
     } catch (error) {
       console.error(`Error reading sheet ${sheetName}:`, error);
-      throw error;
+      throw new Error(`Failed to read from ${sheetName}: ${error.message}`);
     }
   }
 
@@ -109,10 +129,11 @@ class GoogleSheetsService {
         },
       });
 
+      console.log(`Successfully appended data to ${sheetName}`);
       return response.data;
     } catch (error) {
       console.error(`Error appending to sheet ${sheetName}:`, error);
-      throw error;
+      throw new Error(`Failed to append to ${sheetName}: ${error.message}`);
     }
   }
 
@@ -132,10 +153,11 @@ class GoogleSheetsService {
         },
       });
 
+      console.log(`Successfully updated ${sheetName} range ${range}`);
       return response.data;
     } catch (error) {
       console.error(`Error updating sheet ${sheetName}:`, error);
-      throw error;
+      throw new Error(`Failed to update ${sheetName}: ${error.message}`);
     }
   }
 
@@ -147,7 +169,16 @@ class GoogleSheetsService {
   async getUserByCredentials(username: string, password: string): Promise<any | null> {
     try {
       const users = await this.getUsers();
+      // For now, we'll do simple password comparison
+      // In production, you should hash passwords
       const user = users.find(u => u.username === username && u.password === password);
+      
+      if (user) {
+        console.log(`User found: ${username}`);
+      } else {
+        console.log(`User not found or invalid credentials: ${username}`);
+      }
+      
       return user || null;
     } catch (error) {
       console.error('Error getting user by credentials:', error);
@@ -156,8 +187,9 @@ class GoogleSheetsService {
   }
 
   async addUser(userData: any): Promise<any> {
+    const id = this.generateId();
     const values = [
-      userData.id || this.generateId(),
+      id,
       userData.username,
       userData.name,
       userData.role,
@@ -165,26 +197,30 @@ class GoogleSheetsService {
       userData.active ? 'true' : 'false',
       JSON.stringify(userData.permissions || {}),
       JSON.stringify(userData.settings || {}),
-      userData.created_at || new Date().toISOString(),
-      userData.updated_at || new Date().toISOString(),
+      userData.created_at || new Date().toLocaleDateString('fa-IR'),
+      userData.updated_at || new Date().toLocaleDateString('fa-IR'),
       userData.email || '',
-      userData.auth_user_id || ''
+      userData.auth_user_id || id
     ];
     
     await this.appendToSheet('users', values);
-    return { id: values[0], ...userData };
+    return { id, ...userData };
   }
 
   async updateUser(id: string, userData: any): Promise<any> {
     const users = await this.getUsers();
-    const userIndex = users.findIndex(u => u.id === id);
+    const user = users.find(u => u.id === id);
     
-    if (userIndex === -1) {
+    if (!user) {
       throw new Error('User not found');
     }
 
     // Update the user data
-    const updatedUser = { ...users[userIndex], ...userData, updated_at: new Date().toISOString() };
+    const updatedUser = { 
+      ...user, 
+      ...userData, 
+      updated_at: new Date().toLocaleDateString('fa-IR') 
+    };
     
     // Convert back to array format for updating
     const values = [
@@ -194,22 +230,30 @@ class GoogleSheetsService {
       updatedUser.role,
       updatedUser.job_description || '',
       updatedUser.active ? 'true' : 'false',
-      JSON.stringify(updatedUser.permissions || {}),
-      JSON.stringify(updatedUser.settings || {}),
+      typeof updatedUser.permissions === 'string' ? updatedUser.permissions : JSON.stringify(updatedUser.permissions || {}),
+      typeof updatedUser.settings === 'string' ? updatedUser.settings : JSON.stringify(updatedUser.settings || {}),
       updatedUser.created_at,
       updatedUser.updated_at,
       updatedUser.email || '',
-      updatedUser.auth_user_id || ''
+      updatedUser.auth_user_id || updatedUser.id
     ];
 
-    await this.updateSheet('users', `A${userIndex + 2}:L${userIndex + 2}`, [values]);
+    await this.updateSheet('users', `A${user._rowNumber}:L${user._rowNumber}`, [values]);
     return updatedUser;
   }
 
   async deleteUser(id: string): Promise<void> {
-    // Implementation for deleting user
-    // This would involve finding the row and clearing it or shifting rows up
-    console.log('Delete user:', id);
+    const users = await this.getUsers();
+    const user = users.find(u => u.id === id);
+    
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Clear the row (set all values to empty)
+    const emptyValues = new Array(12).fill('');
+    await this.updateSheet('users', `A${user._rowNumber}:L${user._rowNumber}`, [emptyValues]);
+    console.log(`User ${id} deleted successfully`);
   }
 
   // Customer-specific methods
@@ -218,52 +262,64 @@ class GoogleSheetsService {
   }
 
   async addCustomer(customerData: any): Promise<any> {
+    const id = this.generateId();
+    const code = customerData.code || this.generateCustomerId();
+    
     const values = [
-      customerData.id || this.generateId(),
-      customerData.customer_id || this.generateCustomerId(),
-      customerData.first_name,
-      customerData.last_name,
+      id,
+      code,
+      customerData.name,
       customerData.phone,
-      customerData.password_hash || '',
-      customerData.created_at || new Date().toISOString(),
-      customerData.updated_at || new Date().toISOString(),
       customerData.email || '',
-      customerData.can_login ? 'true' : 'false'
+      customerData.can_login ? 'true' : 'false',
+      customerData.created_at || new Date().toLocaleDateString('fa-IR'),
+      customerData.updated_at || new Date().toLocaleDateString('fa-IR')
     ];
     
     await this.appendToSheet('customers', values);
-    return { id: values[0], ...customerData };
+    return { id, code, ...customerData };
   }
 
   async updateCustomer(id: string, customerData: any): Promise<any> {
     const customers = await this.getCustomers();
-    const customerIndex = customers.findIndex(c => c.id === id);
+    const customer = customers.find(c => c.id === id);
     
-    if (customerIndex === -1) {
+    if (!customer) {
       throw new Error('Customer not found');
     }
 
-    const updatedCustomer = { ...customers[customerIndex], ...customerData, updated_at: new Date().toISOString() };
+    const updatedCustomer = { 
+      ...customer, 
+      ...customerData, 
+      updated_at: new Date().toLocaleDateString('fa-IR') 
+    };
     
     const values = [
       updatedCustomer.id,
-      updatedCustomer.customer_id,
-      updatedCustomer.first_name,
-      updatedCustomer.last_name,
+      updatedCustomer.code,
+      updatedCustomer.name,
       updatedCustomer.phone,
-      updatedCustomer.password_hash || '',
-      updatedCustomer.created_at,
-      updatedCustomer.updated_at,
       updatedCustomer.email || '',
-      updatedCustomer.can_login ? 'true' : 'false'
+      updatedCustomer.can_login ? 'true' : 'false',
+      updatedCustomer.created_at,
+      updatedCustomer.updated_at
     ];
 
-    await this.updateSheet('customers', `A${customerIndex + 2}:J${customerIndex + 2}`, [values]);
+    await this.updateSheet('customers', `A${customer._rowNumber}:H${customer._rowNumber}`, [values]);
     return updatedCustomer;
   }
 
   async deleteCustomer(id: string): Promise<void> {
-    console.log('Delete customer:', id);
+    const customers = await this.getCustomers();
+    const customer = customers.find(c => c.id === id);
+    
+    if (!customer) {
+      throw new Error('Customer not found');
+    }
+
+    const emptyValues = new Array(8).fill('');
+    await this.updateSheet('customers', `A${customer._rowNumber}:H${customer._rowNumber}`, [emptyValues]);
+    console.log(`Customer ${id} deleted successfully`);
   }
 
   // Reception-specific methods
@@ -272,8 +328,9 @@ class GoogleSheetsService {
   }
 
   async addReception(receptionData: any): Promise<any> {
+    const id = this.generateId();
     const values = [
-      receptionData.id || this.generateId(),
+      id,
       JSON.stringify(receptionData.customer_info),
       JSON.stringify(receptionData.vehicle_info),
       JSON.stringify(receptionData.service_info),
@@ -283,45 +340,58 @@ class GoogleSheetsService {
       receptionData.billing ? JSON.stringify(receptionData.billing) : '',
       receptionData.completed_at || '',
       receptionData.completed_by || '',
-      receptionData.created_at || new Date().toISOString(),
-      receptionData.updated_at || new Date().toISOString()
+      receptionData.created_at || new Date().toLocaleDateString('fa-IR'),
+      receptionData.updated_at || new Date().toLocaleDateString('fa-IR')
     ];
     
     await this.appendToSheet('receptions', values);
-    return { id: values[0], ...receptionData };
+    return { id, ...receptionData };
   }
 
   async updateReception(id: string, receptionData: any): Promise<any> {
     const receptions = await this.getReceptions();
-    const receptionIndex = receptions.findIndex(r => r.id === id);
+    const reception = receptions.find(r => r.id === id);
     
-    if (receptionIndex === -1) {
+    if (!reception) {
       throw new Error('Reception not found');
     }
 
-    const updatedReception = { ...receptions[receptionIndex], ...receptionData, updated_at: new Date().toISOString() };
+    const updatedReception = { 
+      ...reception, 
+      ...receptionData, 
+      updated_at: new Date().toLocaleDateString('fa-IR') 
+    };
     
     const values = [
       updatedReception.id,
-      JSON.stringify(updatedReception.customer_info),
-      JSON.stringify(updatedReception.vehicle_info),
-      JSON.stringify(updatedReception.service_info),
+      typeof updatedReception.customer_info === 'string' ? updatedReception.customer_info : JSON.stringify(updatedReception.customer_info),
+      typeof updatedReception.vehicle_info === 'string' ? updatedReception.vehicle_info : JSON.stringify(updatedReception.vehicle_info),
+      typeof updatedReception.service_info === 'string' ? updatedReception.service_info : JSON.stringify(updatedReception.service_info),
       updatedReception.status,
       updatedReception.images || '',
       updatedReception.documents || '',
-      updatedReception.billing ? JSON.stringify(updatedReception.billing) : '',
+      updatedReception.billing ? (typeof updatedReception.billing === 'string' ? updatedReception.billing : JSON.stringify(updatedReception.billing)) : '',
       updatedReception.completed_at || '',
       updatedReception.completed_by || '',
       updatedReception.created_at,
       updatedReception.updated_at
     ];
 
-    await this.updateSheet('receptions', `A${receptionIndex + 2}:L${receptionIndex + 2}`, [values]);
+    await this.updateSheet('receptions', `A${reception._rowNumber}:L${reception._rowNumber}`, [values]);
     return updatedReception;
   }
 
   async deleteReception(id: string): Promise<void> {
-    console.log('Delete reception:', id);
+    const receptions = await this.getReceptions();
+    const reception = receptions.find(r => r.id === id);
+    
+    if (!reception) {
+      throw new Error('Reception not found');
+    }
+
+    const emptyValues = new Array(12).fill('');
+    await this.updateSheet('receptions', `A${reception._rowNumber}:L${reception._rowNumber}`, [emptyValues]);
+    console.log(`Reception ${id} deleted successfully`);
   }
 
   // Task-specific methods
@@ -330,8 +400,9 @@ class GoogleSheetsService {
   }
 
   async addTask(taskData: any): Promise<any> {
+    const id = this.generateId();
     const values = [
-      taskData.id || this.generateId(),
+      id,
       taskData.title,
       taskData.description || '',
       taskData.status || 'pending',
@@ -343,23 +414,27 @@ class GoogleSheetsService {
       taskData.due_date || '',
       taskData.images || '',
       JSON.stringify(taskData.history || []),
-      taskData.created_at || new Date().toISOString(),
-      taskData.updated_at || new Date().toISOString()
+      taskData.created_at || new Date().toLocaleDateString('fa-IR'),
+      taskData.updated_at || new Date().toLocaleDateString('fa-IR')
     ];
     
     await this.appendToSheet('tasks', values);
-    return { id: values[0], ...taskData };
+    return { id, ...taskData };
   }
 
   async updateTask(id: string, taskData: any): Promise<any> {
     const tasks = await this.getTasks();
-    const taskIndex = tasks.findIndex(t => t.id === id);
+    const task = tasks.find(t => t.id === id);
     
-    if (taskIndex === -1) {
+    if (!task) {
       throw new Error('Task not found');
     }
 
-    const updatedTask = { ...tasks[taskIndex], ...taskData, updated_at: new Date().toISOString() };
+    const updatedTask = { 
+      ...task, 
+      ...taskData, 
+      updated_at: new Date().toLocaleDateString('fa-IR') 
+    };
     
     const values = [
       updatedTask.id,
@@ -370,20 +445,29 @@ class GoogleSheetsService {
       updatedTask.assigned_to_id,
       updatedTask.assigned_to_name,
       updatedTask.vehicle_id,
-      JSON.stringify(updatedTask.vehicle_info),
+      typeof updatedTask.vehicle_info === 'string' ? updatedTask.vehicle_info : JSON.stringify(updatedTask.vehicle_info),
       updatedTask.due_date || '',
       updatedTask.images || '',
-      JSON.stringify(updatedTask.history || []),
+      typeof updatedTask.history === 'string' ? updatedTask.history : JSON.stringify(updatedTask.history || []),
       updatedTask.created_at,
       updatedTask.updated_at
     ];
 
-    await this.updateSheet('tasks', `A${taskIndex + 2}:N${taskIndex + 2}`, [values]);
+    await this.updateSheet('tasks', `A${task._rowNumber}:N${task._rowNumber}`, [values]);
     return updatedTask;
   }
 
   async deleteTask(id: string): Promise<void> {
-    console.log('Delete task:', id);
+    const tasks = await this.getTasks();
+    const task = tasks.find(t => t.id === id);
+    
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    const emptyValues = new Array(14).fill('');
+    await this.updateSheet('tasks', `A${task._rowNumber}:N${task._rowNumber}`, [emptyValues]);
+    console.log(`Task ${id} deleted successfully`);
   }
 
   // Message-specific methods
@@ -392,29 +476,30 @@ class GoogleSheetsService {
   }
 
   async addMessage(messageData: any): Promise<any> {
+    const id = this.generateId();
     const values = [
-      messageData.id || this.generateId(),
+      id,
       messageData.from_user_id,
       messageData.to_user_id,
       messageData.subject,
       messageData.content,
       messageData.read || 'false',
-      messageData.created_at || new Date().toISOString()
+      messageData.created_at || new Date().toLocaleDateString('fa-IR')
     ];
     
     await this.appendToSheet('messages', values);
-    return { id: values[0], ...messageData };
+    return { id, ...messageData };
   }
 
   async updateMessage(id: string, messageData: any): Promise<any> {
     const messages = await this.getMessages();
-    const messageIndex = messages.findIndex(m => m.id === id);
+    const message = messages.find(m => m.id === id);
     
-    if (messageIndex === -1) {
+    if (!message) {
       throw new Error('Message not found');
     }
 
-    const updatedMessage = { ...messages[messageIndex], ...messageData };
+    const updatedMessage = { ...message, ...messageData };
     
     const values = [
       updatedMessage.id,
@@ -426,12 +511,21 @@ class GoogleSheetsService {
       updatedMessage.created_at
     ];
 
-    await this.updateSheet('messages', `A${messageIndex + 2}:G${messageIndex + 2}`, [values]);
+    await this.updateSheet('messages', `A${message._rowNumber}:G${message._rowNumber}`, [values]);
     return updatedMessage;
   }
 
   async deleteMessage(id: string): Promise<void> {
-    console.log('Delete message:', id);
+    const messages = await this.getMessages();
+    const message = messages.find(m => m.id === id);
+    
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    const emptyValues = new Array(7).fill('');
+    await this.updateSheet('messages', `A${message._rowNumber}:G${message._rowNumber}`, [emptyValues]);
+    console.log(`Message ${id} deleted successfully`);
   }
 
   // SMS-specific methods
@@ -440,30 +534,35 @@ class GoogleSheetsService {
   }
 
   async addSMSSettings(settingsData: any): Promise<any> {
+    const id = this.generateId();
     const values = [
-      settingsData.id || this.generateId(),
+      id,
       settingsData.username || '',
       settingsData.password_hash || '',
       settingsData.from_number || '',
       settingsData.enabled ? 'true' : 'false',
       JSON.stringify(settingsData.templates || []),
-      settingsData.created_at || new Date().toISOString(),
-      settingsData.updated_at || new Date().toISOString()
+      settingsData.created_at || new Date().toLocaleDateString('fa-IR'),
+      settingsData.updated_at || new Date().toLocaleDateString('fa-IR')
     ];
     
     await this.appendToSheet('sms_settings', values);
-    return { id: values[0], ...settingsData };
+    return { id, ...settingsData };
   }
 
   async updateSMSSettings(id: string, settingsData: any): Promise<any> {
     const settings = await this.getSMSSettings();
-    const settingsIndex = settings.findIndex(s => s.id === id);
+    const setting = settings.find(s => s.id === id);
     
-    if (settingsIndex === -1) {
+    if (!setting) {
       throw new Error('SMS settings not found');
     }
 
-    const updatedSettings = { ...settings[settingsIndex], ...settingsData, updated_at: new Date().toISOString() };
+    const updatedSettings = { 
+      ...setting, 
+      ...settingsData, 
+      updated_at: new Date().toLocaleDateString('fa-IR') 
+    };
     
     const values = [
       updatedSettings.id,
@@ -471,12 +570,12 @@ class GoogleSheetsService {
       updatedSettings.password_hash || '',
       updatedSettings.from_number || '',
       updatedSettings.enabled ? 'true' : 'false',
-      JSON.stringify(updatedSettings.templates || []),
+      typeof updatedSettings.templates === 'string' ? updatedSettings.templates : JSON.stringify(updatedSettings.templates || []),
       updatedSettings.created_at,
       updatedSettings.updated_at
     ];
 
-    await this.updateSheet('sms_settings', `A${settingsIndex + 2}:H${settingsIndex + 2}`, [values]);
+    await this.updateSheet('sms_settings', `A${setting._rowNumber}:H${setting._rowNumber}`, [values]);
     return updatedSettings;
   }
 
@@ -485,18 +584,19 @@ class GoogleSheetsService {
   }
 
   async addSMSLog(logData: any): Promise<any> {
+    const id = this.generateId();
     const values = [
-      logData.id || this.generateId(),
+      id,
       logData.to_number,
       logData.message,
       logData.status,
       logData.template_used || '',
       logData.cost || 0,
-      logData.sent_at || new Date().toISOString()
+      logData.sent_at || new Date().toLocaleDateString('fa-IR')
     ];
     
     await this.appendToSheet('sms_logs', values);
-    return { id: values[0], ...logData };
+    return { id, ...logData };
   }
 
   // Utility methods

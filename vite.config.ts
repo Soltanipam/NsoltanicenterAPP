@@ -9,6 +9,7 @@ export default defineConfig({
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+    'process.env.GOOGLE_APPLICATION_CREDENTIALS': JSON.stringify('./config/credentials.json'),
     'process': JSON.stringify({
       stdout: { isTTY: false },
       stderr: { isTTY: false }

@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { AlertCircle, Wifi, WifiOff, User, Lock, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Wifi, WifiOff, User, Lock, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Logo from '../../components/ui/Logo';
 import Button from '../../components/ui/Button';
@@ -59,8 +59,8 @@ const Login = () => {
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('خطا در برقراری ارتباط با سرور');
-      toast.error('خطا در برقراری ارتباط با سرور');
+      setError('خطا در برقراری ارتباط با Google Sheets');
+      toast.error('خطا در برقراری ارتباط با Google Sheets');
     } finally {
       setLoading(false);
     }
@@ -94,7 +94,7 @@ const Login = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
           <p className="text-lg">در حال بارگذاری...</p>
-          <p className="text-sm text-gray-500 mt-2">آماده‌سازی سیستم</p>
+          <p className="text-sm text-gray-500 mt-2">آماده‌سازی سیستم و اتصال به Google Sheets</p>
         </div>
       </div>
     );
@@ -117,7 +117,7 @@ const Login = () => {
             <div className="mt-3 flex items-center gap-2">
               {connectionStatus === 'checking' && (
                 <>
-                  <Wifi className="h-4 w-4 text-yellow-500" />
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-500"></div>
                   <span className="text-sm text-yellow-600 dark:text-yellow-400">
                     بررسی اتصال...
                   </span>
@@ -125,7 +125,7 @@ const Login = () => {
               )}
               {connectionStatus === 'connected' && (
                 <>
-                  <Wifi className="h-4 w-4 text-green-500" />
+                  <CheckCircle className="h-4 w-4 text-green-500" />
                   <span className="text-sm text-green-600 dark:text-green-400">
                     متصل به Google Sheets
                   </span>
@@ -133,9 +133,9 @@ const Login = () => {
               )}
               {connectionStatus === 'disconnected' && (
                 <>
-                  <WifiOff className="h-4 w-4 text-red-500" />
+                  <XCircle className="h-4 w-4 text-red-500" />
                   <span className="text-sm text-red-600 dark:text-red-400">
-                    قطع اتصال - بررسی credentials.json
+                    قطع اتصال - بررسی تنظیمات
                   </span>
                 </>
               )}
@@ -159,7 +159,7 @@ const Login = () => {
             </div>
           )}
 
-          {/* Login Instructions */}
+          {/* Setup Instructions */}
           <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
             <div className="flex items-start gap-3">
               <AlertCircle size={20} className="text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
@@ -171,7 +171,7 @@ const Login = () => {
                   <p><strong>نام کاربری:</strong> admin</p>
                   <p><strong>رمز عبور:</strong> admin123</p>
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                    برای اتصال به Google Sheets، فایل credentials.json را در مسیر src/config قرار دهید
+                    برای اتصال به Google Sheets، فایل credentials.json را در مسیر /config قرار دهید
                   </p>
                 </div>
               </div>
@@ -241,7 +241,7 @@ const Login = () => {
                 size="lg"
                 isLoading={loading}
                 fullWidth
-                disabled={loading}
+                disabled={loading || connectionStatus === 'disconnected'}
               >
                 ورود به سیستم
               </Button>
@@ -261,11 +261,11 @@ const Login = () => {
             </div>
           </form>
 
-          {/* Credentials Info */}
+          {/* Setup Instructions */}
           {connectionStatus === 'disconnected' && (
             <div className="mt-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
               <p className="text-yellow-800 dark:text-yellow-200 text-sm">
-                <strong>نیاز به تنظیم:</strong> برای اتصال به Google Sheets، فایل credentials.json را در مسیر src/config قرار دهید.
+                <strong>نیاز به تنظیم:</strong> برای اتصال به Google Sheets، فایل credentials.json را در مسیر /config قرار دهید و شناسه صحیح Google Sheets را در کد تنظیم کنید.
               </p>
             </div>
           )}
