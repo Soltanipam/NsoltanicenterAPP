@@ -17,7 +17,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Configure multer for file uploads
@@ -28,8 +31,14 @@ const upload = multer({
   },
 });
 
-// Serve static files from dist directory
-app.use(express.static(path.join(__dirname, 'dist')));
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // API Routes
 
@@ -37,19 +46,46 @@ app.use(express.static(path.join(__dirname, 'dist')));
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'نام کاربری و رمز عبور الزامی است' 
+      });
+    }
+
     const result = await loginUser(username, password);
-    res.json(result);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(401).json(result);
+    }
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Login API error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: `خطای سرور: ${error.message}` 
+    });
   }
 });
 
 app.get('/api/auth/check-connection', async (req, res) => {
   try {
     const result = await checkConnection();
-    res.json(result);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(503).json(result);
+    }
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Connection check API error:', error);
+    res.status(500).json({ 
+      success: false, 
+      connected: false,
+      error: `خطای سرور: ${error.message}` 
+    });
   }
 });
 
@@ -285,6 +321,9 @@ app.delete('/api/upload/file/:fileId', async (req, res) => {
   }
 });
 
+// Serve static files from dist directory
+app.use(express.static(path.join(__dirname, 'dist')));
+
 // Serve React app for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
@@ -295,11 +334,24 @@ app.use((error, req, res, next) => {
   console.error('Server error:', error);
   res.status(500).json({ 
     success: false, 
-    error: 'Internal server error' 
+    error: 'خطای داخلی سرور' 
   });
 });
 
+// Start server
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`API available at http://localhost:${PORT}/api`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📊 API available at http://localhost:${PORT}/api`);
+  console.log(`🌐 Frontend proxy configured for development`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  process.exit(0);
 });

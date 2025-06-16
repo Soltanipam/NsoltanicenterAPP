@@ -3,6 +3,12 @@ import { googleSheetsAPI } from '../googleSheets';
 
 export async function loginUser(username: string, password: string) {
   try {
+    // Check if Google Sheets API is ready
+    if (!googleSheetsAPI.isReady()) {
+      console.log('Initializing Google Sheets API...');
+      await googleSheetsAPI.initialize();
+    }
+
     const users = await googleSheetsAPI.readSheet('users');
     
     // Find user with matching credentials
@@ -61,17 +67,25 @@ export async function loginUser(username: string, password: string) {
     console.error('Login error:', error);
     return {
       success: false,
-      message: 'خطا در برقراری ارتباط با Google Sheets'
+      message: `خطا در برقراری ارتباط با Google Sheets: ${error.message}`
     };
   }
 }
 
 export async function checkConnection() {
   try {
-    await googleSheetsAPI.readSheet('users');
-    return { success: true, connected: true };
+    const healthCheck = await googleSheetsAPI.healthCheck();
+    return { 
+      success: healthCheck.status === 'healthy', 
+      connected: healthCheck.status === 'healthy',
+      message: healthCheck.message
+    };
   } catch (error) {
     console.error('Connection check failed:', error);
-    return { success: false, connected: false, error: error.message };
+    return { 
+      success: false, 
+      connected: false, 
+      error: error.message 
+    };
   }
 }
