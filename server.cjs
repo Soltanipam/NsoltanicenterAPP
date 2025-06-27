@@ -4,14 +4,14 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 
-// Import API routes
-const { loginUser, checkConnection } = require('./src/api/routes/auth');
-const { getUsers, createUser, updateUser, deleteUser } = require('./src/api/routes/users');
-const { getCustomers, createCustomer, updateCustomer, deleteCustomer } = require('./src/api/routes/customers');
-const { getReceptions, createReception, updateReception, deleteReception } = require('./src/api/routes/receptions');
-const { getTasks, createTask, updateTask, deleteTask } = require('./src/api/routes/tasks');
-const { getMessages, createMessage, updateMessage, deleteMessage } = require('./src/api/routes/messages');
-const { uploadFile, uploadMultipleFiles, deleteFile } = require('./src/api/routes/upload');
+// Import API routes from compiled JavaScript files
+const { loginUser, checkConnection } = require('./dist-server/api/routes/auth');
+const { getUsers, createUser, updateUser, deleteUser } = require('./dist-server/api/routes/users');
+const { getCustomers, createCustomer, updateCustomer, deleteCustomer } = require('./dist-server/api/routes/customers');
+const { getReceptions, createReception, updateReception, deleteReception } = require('./dist-server/api/routes/receptions');
+const { getTasks, createTask, updateTask, deleteTask } = require('./dist-server/api/routes/tasks');
+const { getMessages, createMessage, updateMessage, deleteMessage } = require('./dist-server/api/routes/messages');
+const { uploadFile, uploadMultipleFiles, deleteFile } = require('./dist-server/api/routes/upload');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -30,23 +30,6 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
 });
-
-// Initialize Google APIs on startup (but don't fail if they can't initialize)
-async function initializeGoogleAPIs() {
-  try {
-    console.log('Initializing Google APIs...');
-    const { googleSheetsAPI } = require('./src/api/googleSheets.ts');
-    const { googleDriveAPI } = require('./src/api/googleDrive.ts');
-    
-    // Initialize both APIs (they won't throw errors now)
-    await googleSheetsAPI.initialize();
-    await googleDriveAPI.initialize();
-    
-    console.log('Google APIs initialization completed');
-  } catch (error) {
-    console.warn('Google APIs initialization failed, but server will continue:', error.message);
-  }
-}
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -355,26 +338,12 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Initialize Google APIs and start server
-async function startServer() {
-  try {
-    // Initialize Google APIs (won't fail the server startup)
-    await initializeGoogleAPIs();
-    
-    // Start server
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📊 API available at http://localhost:${PORT}/api`);
-      console.log(`🌐 Frontend proxy configured for development`);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
-}
-
-// Start the server
-startServer();
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📊 API available at http://localhost:${PORT}/api`);
+  console.log(`🌐 Frontend proxy configured for development`);
+});
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

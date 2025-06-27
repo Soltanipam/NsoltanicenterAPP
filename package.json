@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run server\" \"vite\"",
-    "server": "node server.cjs",
+    "build:server": "tsc -p tsconfig.server.json",
+    "dev": "npm run build:server && concurrently \"npm run server\" \"vite\"",
+    "server": "npm run build:server && node server.cjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
