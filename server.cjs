@@ -4,14 +4,14 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 
-// Import API routes from compiled JavaScript files
-const { loginUser, checkConnection } = require('./dist-server/api/routes/auth');
-const { getUsers, createUser, updateUser, deleteUser } = require('./dist-server/api/routes/users');
-const { getCustomers, createCustomer, updateCustomer, deleteCustomer } = require('./dist-server/api/routes/customers');
-const { getReceptions, createReception, updateReception, deleteReception } = require('./dist-server/api/routes/receptions');
-const { getTasks, createTask, updateTask, deleteTask } = require('./dist-server/api/routes/tasks');
-const { getMessages, createMessage, updateMessage, deleteMessage } = require('./dist-server/api/routes/messages');
-const { uploadFile, uploadMultipleFiles, deleteFile } = require('./dist-server/api/routes/upload');
+// Import API routes from TypeScript source files
+const { loginUser, checkConnection } = require('./src/api/routes/auth');
+const { getUsers, createUser, updateUser, deleteUser } = require('./src/api/routes/users');
+const { getCustomers, createCustomer, updateCustomer, deleteCustomer } = require('./src/api/routes/customers');
+const { getReceptions, createReception, updateReception, deleteReception } = require('./src/api/routes/receptions');
+const { getTasks, createTask, updateTask, deleteTask } = require('./src/api/routes/tasks');
+const { getMessages, createMessage, updateMessage, deleteMessage } = require('./src/api/routes/messages');
+const { uploadFile, uploadMultipleFiles, deleteFile } = require('./src/api/routes/upload');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
