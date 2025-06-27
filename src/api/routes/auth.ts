@@ -67,7 +67,7 @@ export async function loginUser(username: string, password: string) {
     console.error('Login error:', error);
     return {
       success: false,
-      message: `خطا در برقراری ارتباط با Google Sheets: ${error.message}`
+      message: `خطا در برقراری ارتباط با Google Sheets: ${(error as Error).message}`
     };
   }
 }
@@ -85,7 +85,7 @@ export async function checkConnection() {
     return { 
       success: false, 
       connected: false, 
-      error: error.message 
+      error: (error as Error).message 
     };
   }
 }
