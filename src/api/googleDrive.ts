@@ -7,8 +7,14 @@ import path from 'path';
 class GoogleDriveAPI {
   private auth: GoogleAuth | null = null;
   private drive: any = null;
+  private initialized: boolean = false;
+  private initializationError: string | null = null;
 
   async initialize() {
+    if (this.initialized) {
+      return;
+    }
+
     try {
       console.log('Initializing Google Drive API...');
       
@@ -64,17 +70,37 @@ class GoogleDriveAPI {
 
       this.drive = google.drive({ version: 'v3', auth: this.auth });
       
+      this.initialized = true;
+      this.initializationError = null;
       console.log('Google Drive API initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize Google Drive API:', error);
-      throw new Error(`Google Drive initialization failed: ${error.message}`);
+      console.warn('Google Drive API initialization failed:', error.message);
+      this.initialized = false;
+      this.initializationError = error.message;
+      // Don't throw the error - allow the server to continue running
     }
+  }
+
+  // Check if API is ready
+  isReady(): boolean {
+    return this.initialized && this.drive !== null;
+  }
+
+  // Check if there was an initialization error
+  getInitializationError(): string | null {
+    return this.initializationError;
   }
 
   async uploadFile(fileBuffer: Buffer, fileName: string, mimeType: string, folderName?: string): Promise<string | null> {
     try {
-      if (!this.drive) {
+      if (!this.isReady()) {
+        if (this.initializationError) {
+          throw new Error(`Google Drive not available: ${this.initializationError}`);
+        }
         await this.initialize();
+        if (!this.isReady()) {
+          throw new Error(`Google Drive not available: ${this.initializationError || 'Unknown initialization error'}`);
+        }
       }
 
       // Create folder if specified
@@ -149,8 +175,14 @@ class GoogleDriveAPI {
 
   async deleteFile(fileId: string): Promise<void> {
     try {
-      if (!this.drive) {
+      if (!this.isReady()) {
+        if (this.initializationError) {
+          throw new Error(`Google Drive not available: ${this.initializationError}`);
+        }
         await this.initialize();
+        if (!this.isReady()) {
+          throw new Error(`Google Drive not available: ${this.initializationError || 'Unknown initialization error'}`);
+        }
       }
 
       const id = fileId.includes('drive.google.com') 

@@ -9,6 +9,7 @@ class GoogleSheetsAPI {
   private sheets: any = null;
   private spreadsheetId: string = process.env.GOOGLE_SPREADSHEET_ID || '16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w';
   private initialized: boolean = false;
+  private initializationError: string | null = null;
 
   async initialize() {
     if (this.initialized) {
@@ -74,11 +75,13 @@ class GoogleSheetsAPI {
       await this.testConnection();
       
       this.initialized = true;
+      this.initializationError = null;
       console.log('Google Sheets API initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize Google Sheets API:', error);
+      console.warn('Google Sheets API initialization failed:', error.message);
       this.initialized = false;
-      throw new Error(`Google Sheets initialization failed: ${error.message}`);
+      this.initializationError = error.message;
+      // Don't throw the error - allow the server to continue running
     }
   }
 
@@ -113,11 +116,22 @@ class GoogleSheetsAPI {
     return this.initialized && this.sheets !== null;
   }
 
+  // Check if there was an initialization error
+  getInitializationError(): string | null {
+    return this.initializationError;
+  }
+
   // Generic method to read data from any sheet
   async readSheet(sheetName: string, range?: string): Promise<any[]> {
     try {
       if (!this.isReady()) {
+        if (this.initializationError) {
+          throw new Error(`Google Sheets not available: ${this.initializationError}`);
+        }
         await this.initialize();
+        if (!this.isReady()) {
+          throw new Error(`Google Sheets not available: ${this.initializationError || 'Unknown initialization error'}`);
+        }
       }
 
       const fullRange = range ? `${sheetName}!${range}` : `${sheetName}!A:Z`;
@@ -156,7 +170,13 @@ class GoogleSheetsAPI {
   async appendToSheet(sheetName: string, values: any[]): Promise<any> {
     try {
       if (!this.isReady()) {
+        if (this.initializationError) {
+          throw new Error(`Google Sheets not available: ${this.initializationError}`);
+        }
         await this.initialize();
+        if (!this.isReady()) {
+          throw new Error(`Google Sheets not available: ${this.initializationError || 'Unknown initialization error'}`);
+        }
       }
 
       const response = await this.sheets.spreadsheets.values.append({
@@ -180,7 +200,13 @@ class GoogleSheetsAPI {
   async updateSheet(sheetName: string, range: string, values: any[][]): Promise<any> {
     try {
       if (!this.isReady()) {
+        if (this.initializationError) {
+          throw new Error(`Google Sheets not available: ${this.initializationError}`);
+        }
         await this.initialize();
+        if (!this.isReady()) {
+          throw new Error(`Google Sheets not available: ${this.initializationError || 'Unknown initialization error'}`);
+        }
       }
 
       const response = await this.sheets.spreadsheets.values.update({
@@ -204,7 +230,13 @@ class GoogleSheetsAPI {
   async healthCheck(): Promise<{ status: string; message: string }> {
     try {
       if (!this.isReady()) {
+        if (this.initializationError) {
+          return { status: 'error', message: `Google Sheets not available: ${this.initializationError}` };
+        }
         await this.initialize();
+        if (!this.isReady()) {
+          return { status: 'error', message: `Google Sheets not available: ${this.initializationError || 'Unknown initialization error'}` };
+        }
       }
       
       await this.testConnection();

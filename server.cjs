@@ -31,6 +31,23 @@ const upload = multer({
   },
 });
 
+// Initialize Google APIs on startup (but don't fail if they can't initialize)
+async function initializeGoogleAPIs() {
+  try {
+    console.log('Initializing Google APIs...');
+    const { googleSheetsAPI } = require('./src/api/googleSheets.ts');
+    const { googleDriveAPI } = require('./src/api/googleDrive.ts');
+    
+    // Initialize both APIs (they won't throw errors now)
+    await googleSheetsAPI.initialize();
+    await googleDriveAPI.initialize();
+    
+    console.log('Google APIs initialization completed');
+  } catch (error) {
+    console.warn('Google APIs initialization failed, but server will continue:', error.message);
+  }
+}
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 
@@ -338,12 +355,26 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 API available at http://localhost:${PORT}/api`);
-  console.log(`🌐 Frontend proxy configured for development`);
-});
+// Initialize Google APIs and start server
+async function startServer() {
+  try {
+    // Initialize Google APIs (won't fail the server startup)
+    await initializeGoogleAPIs();
+    
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📊 API available at http://localhost:${PORT}/api`);
+      console.log(`🌐 Frontend proxy configured for development`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
