@@ -7,7 +7,7 @@ export async function getReceptions() {
     return { success: true, data: receptions };
   } catch (error) {
     console.error('Error getting receptions:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
 
@@ -33,7 +33,7 @@ export async function createReception(receptionData: any) {
     return { success: true, data: { id, ...receptionData } };
   } catch (error) {
     console.error('Error creating reception:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
 
@@ -71,7 +71,7 @@ export async function updateReception(id: string, receptionData: any) {
     return { success: true, data: updatedReception };
   } catch (error) {
     console.error('Error updating reception:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
 
@@ -89,6 +89,6 @@ export async function deleteReception(id: string) {
     return { success: true };
   } catch (error) {
     console.error('Error deleting reception:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }

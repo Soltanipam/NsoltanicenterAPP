@@ -1,6 +1,6 @@
 // Server-side Google Drive API handler
 import { google } from 'googleapis';
-import { GoogleAuth, Credentials } from 'google-auth-library';
+import { GoogleAuth, CredentialBody } from 'google-auth-library';
 import fs from 'fs';
 import path from 'path';
 
@@ -25,7 +25,7 @@ class GoogleDriveAPI {
         path.resolve(process.cwd(), 'public', 'config', 'credentials.json')
       ];
 
-      let credentials: Credentials | null = null;
+      let credentials: CredentialBody | null = null;
       let credentialsPath = null;
 
       for (const pathToCheck of credentialsPaths) {
@@ -41,7 +41,7 @@ class GoogleDriveAPI {
 
       try {
         const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
-        credentials = JSON.parse(credentialsContent) as Credentials;
+        credentials = JSON.parse(credentialsContent) as CredentialBody;
       } catch (parseError) {
         throw new Error(`Failed to parse credentials file: ${(parseError as Error).message}`);
       }
