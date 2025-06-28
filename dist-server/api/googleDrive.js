@@ -9,12 +9,10 @@ const googleapis_1 = require("googleapis");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 class GoogleDriveAPI {
-    constructor() {
-        this.auth = null;
-        this.drive = null;
-        this.initialized = false;
-        this.initializationError = null;
-    }
+    auth = null;
+    drive = null;
+    initialized = false;
+    initializationError = null;
     async initialize() {
         if (this.initialized) {
             return;

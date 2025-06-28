@@ -9,13 +9,11 @@ const googleapis_1 = require("googleapis");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 class GoogleSheetsAPI {
-    constructor() {
-        this.auth = null;
-        this.sheets = null;
-        this.spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || '16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w';
-        this.initialized = false;
-        this.initializationError = null;
-    }
+    auth = null;
+    sheets = null;
+    spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || '16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w';
+    initialized = false;
+    initializationError = null;
     async initialize() {
         if (this.initialized) {
             return;
