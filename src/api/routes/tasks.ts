@@ -7,7 +7,7 @@ export async function getTasks() {
     return { success: true, data: tasks };
   } catch (error) {
     console.error('Error getting tasks:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
 
@@ -35,7 +35,7 @@ export async function createTask(taskData: any) {
     return { success: true, data: { id, ...taskData } };
   } catch (error) {
     console.error('Error creating task:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
 
@@ -75,7 +75,7 @@ export async function updateTask(id: string, taskData: any) {
     return { success: true, data: updatedTask };
   } catch (error) {
     console.error('Error updating task:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
 
@@ -93,6 +93,6 @@ export async function deleteTask(id: string) {
     return { success: true };
   } catch (error) {
     console.error('Error deleting task:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }

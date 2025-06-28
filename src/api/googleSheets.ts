@@ -50,14 +50,14 @@ class GoogleSheetsAPI {
       // Validate required credential fields
       const requiredFields = ['type', 'project_id', 'private_key', 'client_email'];
       for (const field of requiredFields) {
-        if (!credentials[field as keyof Credentials]) {
+        if (!(credentials as any)[field]) {
           throw new Error(`Missing required credential field: ${field}`);
         }
       }
 
       // Check if credentials are placeholder values
-      if (credentials.project_id === 'your-project-id-here' || 
-          credentials.private_key?.includes('YOUR_PRIVATE_KEY_CONTENT_HERE')) {
+      if ((credentials as any).project_id === 'your-project-id-here' || 
+          (credentials as any).private_key?.includes('YOUR_PRIVATE_KEY_CONTENT_HERE')) {
         throw new Error('Credentials file contains placeholder values. Please update with actual Google service account credentials.');
       }
       
@@ -103,7 +103,7 @@ class GoogleSheetsAPI {
       } else if ((error as any).code === 404) {
         throw new Error(`Spreadsheet not found. Please check the spreadsheet ID: ${this.spreadsheetId}. Make sure the spreadsheet exists and is accessible.`);
       } else if ((error as any).code === 403) {
-        throw new Error(`Permission denied. Please ensure the service account (${this.auth?.credentials?.client_email || 'unknown'}) has Editor access to the spreadsheet. Share the spreadsheet with this email address.`);
+        throw new Error(`Permission denied. Please ensure the service account (${(this.auth?.credentials as any)?.client_email || 'unknown'}) has Editor access to the spreadsheet. Share the spreadsheet with this email address.`);
       } else if ((error as any).code === 401) {
         throw new Error('Authentication failed. Please check your service account credentials.');
       }
