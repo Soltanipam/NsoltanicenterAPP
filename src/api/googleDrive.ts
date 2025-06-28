@@ -1,6 +1,6 @@
 // Server-side Google Drive API handler
 import { google } from 'googleapis';
-import { GoogleAuth } from 'google-auth-library';
+import { GoogleAuth, Credentials } from 'google-auth-library';
 import fs from 'fs';
 import path from 'path';
 
@@ -25,7 +25,7 @@ class GoogleDriveAPI {
         path.resolve(process.cwd(), 'public', 'config', 'credentials.json')
       ];
 
-      let credentials = null;
+      let credentials: Credentials | null = null;
       let credentialsPath = null;
 
       for (const pathToCheck of credentialsPaths) {
@@ -41,22 +41,22 @@ class GoogleDriveAPI {
 
       try {
         const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
-        credentials = JSON.parse(credentialsContent);
+        credentials = JSON.parse(credentialsContent) as Credentials;
       } catch (parseError) {
-        throw new Error(`Failed to parse credentials file: ${parseError.message}`);
+        throw new Error(`Failed to parse credentials file: ${(parseError as Error).message}`);
       }
 
       // Validate required credential fields
       const requiredFields = ['type', 'project_id', 'private_key', 'client_email'];
       for (const field of requiredFields) {
-        if (!credentials[field]) {
+        if (!credentials[field as keyof Credentials]) {
           throw new Error(`Missing required credential field: ${field}`);
         }
       }
 
       // Check if credentials are placeholder values
       if (credentials.project_id === 'your-project-id-here' || 
-          credentials.private_key.includes('YOUR_PRIVATE_KEY_CONTENT_HERE')) {
+          credentials.private_key?.includes('YOUR_PRIVATE_KEY_CONTENT_HERE')) {
         throw new Error('Credentials file contains placeholder values. Please update with actual Google service account credentials.');
       }
       
@@ -74,9 +74,9 @@ class GoogleDriveAPI {
       this.initializationError = null;
       console.log('Google Drive API initialized successfully');
     } catch (error) {
-      console.warn('Google Drive API initialization failed:', error.message);
+      console.warn('Google Drive API initialization failed:', (error as Error).message);
       this.initialized = false;
-      this.initializationError = error.message;
+      this.initializationError = (error as Error).message;
       // Don't throw the error - allow the server to continue running
     }
   }

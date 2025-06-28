@@ -12,7 +12,7 @@ export async function uploadFile(fileBuffer: Buffer, fileName: string, mimeType:
     return { success: true, data: { url } };
   } catch (error) {
     console.error('Error uploading file:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
 
@@ -28,7 +28,7 @@ export async function uploadMultipleFiles(files: Array<{ buffer: Buffer, fileNam
     return { success: true, data: { urls } };
   } catch (error) {
     console.error('Error uploading multiple files:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
 
@@ -38,6 +38,6 @@ export async function deleteFile(fileId: string) {
     return { success: true };
   } catch (error) {
     console.error('Error deleting file:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
