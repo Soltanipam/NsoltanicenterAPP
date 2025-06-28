@@ -55,7 +55,7 @@ class GoogleSheetsAPI {
             }
             // Check if credentials are placeholder values
             if (credentials.project_id === 'your-project-id-here' ||
-                credentials.private_key.includes('YOUR_PRIVATE_KEY_CONTENT_HERE')) {
+                credentials.private_key?.includes('YOUR_PRIVATE_KEY_CONTENT_HERE')) {
                 throw new Error('Credentials file contains placeholder values. Please update with actual Google service account credentials.');
             }
             this.auth = new googleapis_1.google.auth.GoogleAuth({
