@@ -1,11 +1,11 @@
 // Server-side Google Sheets API handler
-import { google } from 'googleapis';
-import { GoogleAuth, CredentialBody } from 'google-auth-library';
+import { google, Auth } from 'googleapis';
+import { CredentialBody } from 'google-auth-library';
 import fs from 'fs';
 import path from 'path';
 
 class GoogleSheetsAPI {
-  private auth: GoogleAuth | null = null;
+  private auth: Auth.GoogleAuth | null = null;
   private sheets: any = null;
   private spreadsheetId: string = process.env.GOOGLE_SPREADSHEET_ID || '16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w';
   private initialized: boolean = false;
@@ -69,7 +69,7 @@ class GoogleSheetsAPI {
         ]
       });
 
-      this.sheets = google.sheets({ version: 'v4', auth: this.auth });
+      this.sheets = google.sheets({ version: 'v4', auth: this.auth! });
       
       // Test connection with timeout
       await this.testConnection();

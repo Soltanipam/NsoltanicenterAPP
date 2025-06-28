@@ -1,11 +1,11 @@
 // Server-side Google Drive API handler
-import { google } from 'googleapis';
-import { GoogleAuth, CredentialBody } from 'google-auth-library';
+import { google, Auth } from 'googleapis';
+import { CredentialBody } from 'google-auth-library';
 import fs from 'fs';
 import path from 'path';
 
 class GoogleDriveAPI {
-  private auth: GoogleAuth | null = null;
+  private auth: Auth.GoogleAuth | null = null;
   private drive: any = null;
   private initialized: boolean = false;
   private initializationError: string | null = null;
@@ -68,7 +68,7 @@ class GoogleDriveAPI {
         ]
       });
 
-      this.drive = google.drive({ version: 'v3', auth: this.auth });
+      this.drive = google.drive({ version: 'v3', auth: this.auth! });
       
       this.initialized = true;
       this.initializationError = null;
