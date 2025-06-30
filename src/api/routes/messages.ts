@@ -7,7 +7,7 @@ export async function getMessages() {
     return { success: true, data: messages };
   } catch (error) {
     console.error('Error getting messages:', error);
-    return { success: false, error: (error as Error).message };
+    return { success: false, error: error.message };
   }
 }
 
@@ -28,7 +28,7 @@ export async function createMessage(messageData: any) {
     return { success: true, data: { id, ...messageData } };
   } catch (error) {
     console.error('Error creating message:', error);
-    return { success: false, error: (error as Error).message };
+    return { success: false, error: error.message };
   }
 }
 
@@ -57,7 +57,7 @@ export async function updateMessage(id: string, messageData: any) {
     return { success: true, data: updatedMessage };
   } catch (error) {
     console.error('Error updating message:', error);
-    return { success: false, error: (error as Error).message };
+    return { success: false, error: error.message };
   }
 }
 
@@ -75,6 +75,6 @@ export async function deleteMessage(id: string) {
     return { success: true };
   } catch (error) {
     console.error('Error deleting message:', error);
-    return { success: false, error: (error as Error).message };
+    return { success: false, error: error.message };
   }
 }

@@ -1,11 +1,11 @@
 // Server-side Google Drive API handler
-import { google, Auth } from 'googleapis';
-import { CredentialBody } from 'google-auth-library';
+import { google } from 'googleapis';
+import { GoogleAuth } from 'google-auth-library';
 import fs from 'fs';
 import path from 'path';
 
 class GoogleDriveAPI {
-  private auth: Auth.GoogleAuth | null = null;
+  private auth: GoogleAuth | null = null;
   private drive: any = null;
   private initialized: boolean = false;
   private initializationError: string | null = null;
@@ -25,7 +25,7 @@ class GoogleDriveAPI {
         path.resolve(process.cwd(), 'public', 'config', 'credentials.json')
       ];
 
-      let credentials: CredentialBody | null = null;
+      let credentials = null;
       let credentialsPath = null;
 
       for (const pathToCheck of credentialsPaths) {
@@ -41,22 +41,22 @@ class GoogleDriveAPI {
 
       try {
         const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
-        credentials = JSON.parse(credentialsContent) as CredentialBody;
+        credentials = JSON.parse(credentialsContent);
       } catch (parseError) {
-        throw new Error(`Failed to parse credentials file: ${(parseError as Error).message}`);
+        throw new Error(`Failed to parse credentials file: ${parseError.message}`);
       }
 
       // Validate required credential fields
       const requiredFields = ['type', 'project_id', 'private_key', 'client_email'];
       for (const field of requiredFields) {
-        if (!(credentials as any)[field]) {
+        if (!credentials[field]) {
           throw new Error(`Missing required credential field: ${field}`);
         }
       }
 
       // Check if credentials are placeholder values
-      if ((credentials as any).project_id === 'your-project-id-here' || 
-          (credentials as any).private_key?.includes('YOUR_PRIVATE_KEY_CONTENT_HERE')) {
+      if (credentials.project_id === 'your-project-id-here' || 
+          credentials.private_key.includes('YOUR_PRIVATE_KEY_CONTENT_HERE')) {
         throw new Error('Credentials file contains placeholder values. Please update with actual Google service account credentials.');
       }
       
@@ -68,15 +68,15 @@ class GoogleDriveAPI {
         ]
       });
 
-      this.drive = google.drive({ version: 'v3', auth: this.auth! });
+      this.drive = google.drive({ version: 'v3', auth: this.auth });
       
       this.initialized = true;
       this.initializationError = null;
       console.log('Google Drive API initialized successfully');
     } catch (error) {
-      console.warn('Google Drive API initialization failed:', (error as Error).message);
+      console.warn('Google Drive API initialization failed:', error.message);
       this.initialized = false;
-      this.initializationError = (error as Error).message;
+      this.initializationError = error.message;
       // Don't throw the error - allow the server to continue running
     }
   }

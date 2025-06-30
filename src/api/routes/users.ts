@@ -7,7 +7,7 @@ export async function getUsers() {
     return { success: true, data: users };
   } catch (error) {
     console.error('Error getting users:', error);
-    return { success: false, error: (error as Error).message };
+    return { success: false, error: error.message };
   }
 }
 
@@ -33,7 +33,7 @@ export async function createUser(userData: any) {
     return { success: true, data: { id, ...userData } };
   } catch (error) {
     console.error('Error creating user:', error);
-    return { success: false, error: (error as Error).message };
+    return { success: false, error: error.message };
   }
 }
 
@@ -71,7 +71,7 @@ export async function updateUser(id: string, userData: any) {
     return { success: true, data: updatedUser };
   } catch (error) {
     console.error('Error updating user:', error);
-    return { success: false, error: (error as Error).message };
+    return { success: false, error: error.message };
   }
 }
 
@@ -89,6 +89,6 @@ export async function deleteUser(id: string) {
     return { success: true };
   } catch (error) {
     console.error('Error deleting user:', error);
-    return { success: false, error: (error as Error).message };
+    return { success: false, error: error.message };
   }
 }

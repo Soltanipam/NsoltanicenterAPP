@@ -1,11 +1,11 @@
 // Server-side Google Sheets API handler
-import { google, Auth } from 'googleapis';
-import { CredentialBody } from 'google-auth-library';
+import { google } from 'googleapis';
+import { GoogleAuth } from 'google-auth-library';
 import fs from 'fs';
 import path from 'path';
 
 class GoogleSheetsAPI {
-  private auth: Auth.GoogleAuth | null = null;
+  private auth: GoogleAuth | null = null;
   private sheets: any = null;
   private spreadsheetId: string = process.env.GOOGLE_SPREADSHEET_ID || '16rJEpOdRXhAxY7UFa-20-6ETWaIeOJRtoJ2VPFmec1w';
   private initialized: boolean = false;
@@ -26,7 +26,7 @@ class GoogleSheetsAPI {
         path.resolve(process.cwd(), 'public', 'config', 'credentials.json')
       ];
 
-      let credentials: CredentialBody | null = null;
+      let credentials = null;
       let credentialsPath = null;
 
       for (const pathToCheck of credentialsPaths) {
@@ -42,22 +42,22 @@ class GoogleSheetsAPI {
 
       try {
         const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
-        credentials = JSON.parse(credentialsContent) as CredentialBody;
+        credentials = JSON.parse(credentialsContent);
       } catch (parseError) {
-        throw new Error(`Failed to parse credentials file: ${(parseError as Error).message}`);
+        throw new Error(`Failed to parse credentials file: ${parseError.message}`);
       }
 
       // Validate required credential fields
       const requiredFields = ['type', 'project_id', 'private_key', 'client_email'];
       for (const field of requiredFields) {
-        if (!(credentials as any)[field]) {
+        if (!credentials[field]) {
           throw new Error(`Missing required credential field: ${field}`);
         }
       }
 
       // Check if credentials are placeholder values
-      if ((credentials as any).project_id === 'your-project-id-here' || 
-          (credentials as any).private_key?.includes('YOUR_PRIVATE_KEY_CONTENT_HERE')) {
+      if (credentials.project_id === 'your-project-id-here' || 
+          credentials.private_key.includes('YOUR_PRIVATE_KEY_CONTENT_HERE')) {
         throw new Error('Credentials file contains placeholder values. Please update with actual Google service account credentials.');
       }
       
@@ -69,7 +69,7 @@ class GoogleSheetsAPI {
         ]
       });
 
-      this.sheets = google.sheets({ version: 'v4', auth: this.auth! });
+      this.sheets = google.sheets({ version: 'v4', auth: this.auth });
       
       // Test connection with timeout
       await this.testConnection();
@@ -78,9 +78,9 @@ class GoogleSheetsAPI {
       this.initializationError = null;
       console.log('Google Sheets API initialized successfully');
     } catch (error) {
-      console.warn('Google Sheets API initialization failed:', (error as Error).message);
+      console.warn('Google Sheets API initialization failed:', error.message);
       this.initialized = false;
-      this.initializationError = (error as Error).message;
+      this.initializationError = error.message;
       // Don't throw the error - allow the server to continue running
     }
   }
@@ -98,13 +98,13 @@ class GoogleSheetsAPI {
 
       await Promise.race([testPromise, timeoutPromise]);
     } catch (error) {
-      if ((error as Error).message === 'Connection timeout') {
+      if (error.message === 'Connection timeout') {
         throw new Error('Connection to Google Sheets timed out. Please check your internet connection.');
-      } else if ((error as any).code === 404) {
+      } else if (error.code === 404) {
         throw new Error(`Spreadsheet not found. Please check the spreadsheet ID: ${this.spreadsheetId}. Make sure the spreadsheet exists and is accessible.`);
-      } else if ((error as any).code === 403) {
-        throw new Error(`Permission denied. Please ensure the service account (${(this.auth?.credentials as any)?.client_email || 'unknown'}) has Editor access to the spreadsheet. Share the spreadsheet with this email address.`);
-      } else if ((error as any).code === 401) {
+      } else if (error.code === 403) {
+        throw new Error(`Permission denied. Please ensure the service account (${this.auth?.credentials?.client_email || 'unknown'}) has Editor access to the spreadsheet. Share the spreadsheet with this email address.`);
+      } else if (error.code === 401) {
         throw new Error('Authentication failed. Please check your service account credentials.');
       }
       throw error;
@@ -162,7 +162,7 @@ class GoogleSheetsAPI {
       return data;
     } catch (error) {
       console.error(`Error reading sheet ${sheetName}:`, error);
-      throw new Error(`Failed to read from ${sheetName}: ${(error as Error).message}`);
+      throw new Error(`Failed to read from ${sheetName}: ${error.message}`);
     }
   }
 
@@ -192,7 +192,7 @@ class GoogleSheetsAPI {
       return response.data;
     } catch (error) {
       console.error(`Error appending to sheet ${sheetName}:`, error);
-      throw new Error(`Failed to append to ${sheetName}: ${(error as Error).message}`);
+      throw new Error(`Failed to append to ${sheetName}: ${error.message}`);
     }
   }
 
@@ -222,7 +222,7 @@ class GoogleSheetsAPI {
       return response.data;
     } catch (error) {
       console.error(`Error updating sheet ${sheetName}:`, error);
-      throw new Error(`Failed to update ${sheetName}: ${(error as Error).message}`);
+      throw new Error(`Failed to update ${sheetName}: ${error.message}`);
     }
   }
 
@@ -242,7 +242,7 @@ class GoogleSheetsAPI {
       await this.testConnection();
       return { status: 'healthy', message: 'Google Sheets API is working correctly' };
     } catch (error) {
-      return { status: 'error', message: (error as Error).message };
+      return { status: 'error', message: error.message };
     }
   }
 
